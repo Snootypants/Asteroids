@@ -623,6 +623,10 @@ const ICONS = {
   ricochet: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4v6h6M14 14h6v6" stroke="#bde2ff"/></svg>',
   drone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" stroke="#9fffe6"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4" stroke="#9fffe6"/></svg>'
 };
+function iconFor(key, size=18) {
+  const svg = ICONS[key] || ICONS.fire;
+  return svg.replace(/width=\"\d+\"/, `width=\"${size}\"`).replace(/height=\"\d+\"/, `height=\"${size}\"`);
+}
 function pushTaken(opt) {
   if (!takenEl) return;
   const item = document.createElement('div');
@@ -1048,14 +1052,14 @@ function offerUpgrades() {
   while (options.length < 3 && bag.length) { const i = Math.floor(Math.random()*bag.length); const pick = bag.splice(i,1)[0]; if (!options.includes(pick)) options.push(pick); }
   choiceCardsEl.innerHTML = '';
   const optionsSynced = options.slice();
-  // Simple inline SVG badge
-  const BADGE = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l5 3 3 5-3 5-5 3-5-3-3-5 3-5 5-3z" stroke="#bcd9ff" stroke-width="1.2" fill="rgba(120,160,255,0.15)"/></svg>';
   for (const opt of options) {
     const card = document.createElement('div');
     card.className = 'choice-card';
     card.dataset.rarity = opt.rarity || 'common';
     const syn = synergy(opt);
-    card.innerHTML = `<div class="icon">${BADGE}</div><h3>${opt.label}</h3><p class="desc">${opt.desc}</p>${syn ? `<p class=\"syn\">${syn}</p>`:''}`;
+    const keyBase = opt.key.replace(/\d+$/, '');
+    const ico = iconFor(keyBase, 84);
+    card.innerHTML = `<div class="icon">${ico}</div><h3>${opt.label}</h3><p class="desc">${opt.desc}</p>${syn ? `<p class=\"syn\">${syn}</p>`:''}`;
     card.onclick = () => { opt.apply(); pushTaken(opt); SFX.play('upgrade'); cleanup(); resumeNextWave(); };
     choiceCardsEl.appendChild(card);
   }

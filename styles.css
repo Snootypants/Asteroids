@@ -108,22 +108,27 @@ html, body {
 /* Upgrade cards layout */
 #choices .cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(340px, 420px));
-  gap: 32px;
+  grid-template-columns: repeat(3, 280px);
+  gap: 28px;
 }
 .choice-card {
   cursor: pointer;
   background:
     radial-gradient(120% 100% at 8% 0%, rgba(90,120,200,0.16), rgba(0,0,0,0) 40%),
-    linear-gradient(145deg, rgba(22,28,42,0.95), rgba(10,12,18,0.92)),
-    repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 2px, rgba(0,0,0,0.02) 2px 6px);
-  border: 1px solid rgba(120,150,255,0.25);
-  border-radius: 12px;
-  padding: 18px 22px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 0 40px rgba(80,120,255,0.08);
+    linear-gradient(155deg, rgba(18,24,36,0.96), rgba(10,12,18,0.94)),
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.035) 0 2px, rgba(0,0,0,0.02) 2px 6px);
+  border: 1px solid rgba(120,150,255,0.28);
+  border-radius: 14px;
+  width: 280px;
+  height: 260px;
+  padding: 16px 16px 18px;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.45), inset 0 0 44px rgba(80,120,255,0.08);
   color: #dbe6ff;
   position: relative;
-  transform: perspective(600px) rotateX(0) rotateY(0) translateY(0);
+  display: grid;
+  grid-template-rows: 96px auto auto;
+  align-items: start;
+  transform: perspective(700px) rotateX(0) rotateY(0) translateY(0);
   transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
   will-change: transform, box-shadow, filter;
   opacity: 0; transform: translateY(10px);
@@ -132,20 +137,20 @@ html, body {
 .choice-card:nth-child(1) { animation-delay: .02s; }
 .choice-card:nth-child(2) { animation-delay: .08s; }
 .choice-card:nth-child(3) { animation-delay: .14s; }
-.choice-card h3 { margin: 0 0 8px; font-size: 22px; }
+.choice-card h3 { margin: 0 0 6px; font-size: 20px; }
 .choice-card p { margin: 0; font-size: 13px; opacity: .9; }
 .choice-card .syn { opacity: .75; font-size: 12px; margin-top: 6px; }
 .choice-card:hover {
   filter: brightness(1.08);
-  transform: perspective(600px) translateY(-2px) rotateX(1.2deg) rotateY(-1.2deg);
+  transform: perspective(700px) translateY(-2px) rotateX(1.2deg) rotateY(-1.2deg);
   box-shadow: 0 14px 36px rgba(0,0,0,0.45), inset 0 0 46px rgba(100,140,255,0.10);
 }
 
 /* corner bolts */
 .choice-card::before {
   content: '';
-  position: absolute; inset: 10px;
-  border-radius: 10px;
+  position: absolute; inset: 12px;
+  border-radius: 12px;
   box-shadow:
     0 0 0 1px rgba(150,170,255,0.15) inset,
     0 0 40px rgba(80,120,255,0.08) inset;
@@ -161,8 +166,9 @@ html, body {
               calc(100% - 16px) calc(100% - 16px) 0 0 rgba(120,150,255,0.35);
 }
 
-.choice-card .icon { position:absolute; right:12px; top:10px; opacity:.9; }
-.choice-card:hover .icon { filter: drop-shadow(0 0 6px rgba(160,200,255,0.35)); }
+.choice-card .icon { position: relative; justify-self: center; align-self: center; width: 96px; height: 96px; display: grid; place-items: center; }
+.choice-card .icon svg { filter: drop-shadow(0 0 10px rgba(160,200,255,0.25)); }
+.choice-card:hover .icon { filter: drop-shadow(0 0 10px rgba(160,200,255,0.35)); }
 
 @keyframes popIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
