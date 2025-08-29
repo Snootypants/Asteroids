@@ -694,20 +694,15 @@ function openHangar(){
   while(opts.length<4 && bag.length){ const i=Math.floor(Math.random()*bag.length); opts.push(bag.splice(i,1)[0]); }
   shopCardsEl.innerHTML='';
   for(const o of opts){
-    const card=document.createElement('div'); card.className='choice-card'; card.dataset.rarity=o.rarity||'common';
-    const ico=iconFor(o.key.replace(/\d+$/,''),84);
-    const costStr = [o.cost?.salv?`⛭ ${o.cost.salv}`:'', o.cost?.gold?`◆ ${o.cost.gold}`:'', o.cost?.plat?`◈ ${o.cost.plat}`:'', o.cost?.adam?`⬢ ${o.cost.adam}`:''].filter(Boolean).join(' · ');
-    card.innerHTML=`<div class="icon">${ico}</div><h3>${o.label}</h3><p>${o.desc}</p><p class="cost">${costStr}</p>`;
+    const btn=document.createElement('button'); btn.className='card-btn'; btn.dataset.rarity=o.rarity||'common';
+    const costStr = [o.cost?.salv?`⛭ ${o.cost.salv}`:'', o.cost?.gold?`◆ ${o.cost.gold}`:'', o.cost?.plat?`◈ ${o.cost.plat}`:'', o.cost?.adam?`⬢ ${o.cost.adam}`:''].filter(Boolean).join(' • ');
+    btn.innerHTML=`<div class="card-title">${o.label}</div><div class="card-desc">${o.desc}</div>${costStr?`<div class=\"card-cost\">${costStr}</div>`:''}`;
     const canAfford = (salvage>=(o.cost?.salv||0)) && (gold>=(o.cost?.gold||0)) && (platinum>=(o.cost?.plat||0)) && (adamantium>=(o.cost?.adam||0));
-    if(!canAfford) card.classList.add('disabled');
-    card.onclick=()=>{
-      if(!canAfford) return; 
-      salvage -= (o.cost?.salv||0); gold-=(o.cost?.gold||0); platinum-=(o.cost?.plat||0); adamantium-=(o.cost?.adam||0); updateCurrencyHUD();
-      o.apply(); closeHangar(true);
-    };
-    shopCardsEl.appendChild(card);
+    if(!canAfford) btn.style.filter='grayscale(0.6) brightness(0.8)';
+    btn.onclick=()=>{ if(!canAfford) return; salvage -= (o.cost?.salv||0); gold-=(o.cost?.gold||0); platinum-=(o.cost?.plat||0); adamantium-=(o.cost?.adam||0); updateCurrencyHUD(); o.apply(); closeHangar(true); };
+    shopCardsEl.appendChild(btn);
   }
-  if(leaveShopBtn) leaveShopBtn.onclick=()=>closeHangar(false);
+  attachCard3DInteractions(shopCardsEl);
 }
 
 function closeHangar(purchased){

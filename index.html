@@ -100,8 +100,15 @@
         <h1>HANGAR</h1>
         <p>Spend salvage and ores to upgrade</p>
       </div>
-      <div class="cards" id="shopCards"></div>
-      <button id="leaveShop" class="leave">Leave</button>
+      <div id="shopCards" class="choices choices-3d" aria-live="polite"></div>
+      <div id="choicesMouseLayer" aria-hidden="true"></div>
+      <div class="shop-row" style="position:absolute; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:10px;">
+        <button id="rerollShop">Reroll (🟦 <span id="rerollCost">15</span>)</button>
+        <button id="banishOne">Banish 1 (free)</button>
+        <button id="toggleVis">High-Vis Bullets</button>
+        <button id="leaveHangar">Launch</button>
+      </div>
+      <p id="shopInfo" class="sub" style="position:absolute; bottom:14px; left:50%; transform:translateX(-50%);">Epics unlock after Wave 5 or when you own prerequisites.</p>
     </div>
     <div id="copyright">© 2025 Snootypants. All rights reserved.</div>
     <script type="module" src="src/main.js"></script>
