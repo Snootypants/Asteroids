@@ -679,7 +679,21 @@ function removeFrom(arr, item) {
 
 // Camera shake
 let shakeTime = 0; let shakeMag = 0;
-function addShake(mag = 0.4, time = 0.1) { shakeMag = Math.max(shakeMag, mag); shakeTime = Math.max(shakeTime, time); }
+function addShake(mag = 0.4, time = 0.1, ox = null, oy = null) {
+  // Global reduction by ~30%
+  let m = mag * 0.7;
+  // Distance falloff if origin provided
+  if (ox !== null && oy !== null) {
+    const dx = (ox - ship.position.x); const dy = (oy - ship.position.y);
+    const dist = Math.hypot(dx, dy);
+    const maxR = Math.hypot(WORLD.width * 0.5, WORLD.height * 0.5);
+    const falloff = Math.max(0, 1 - dist / maxR); // 1 near ship → 0 at far edge
+    m *= falloff;
+  }
+  if (m <= 0.001) return;
+  shakeMag = Math.max(shakeMag, m);
+  shakeTime = Math.max(shakeTime, time);
+}
 
 // Game loop
 let last = performance.now() / 1000;
@@ -859,7 +873,7 @@ function update(dt) {
         debris.burst(a.position.x, a.position.y, Math.floor(def.r * 2));
         const kids = splitAsteroid(a);
         asteroids.push(...kids);
-        addShake(0.5, 0.12);
+        addShake(0.5, 0.12, a.position.x, a.position.y);
         if (kids.length === 0) SFX.play('explode'); else SFX.play('hit');
         break outer;
       }
@@ -878,7 +892,7 @@ function update(dt) {
         score += Math.round(ENEMY.score * mult); scoreEl.textContent = `Score: ${score}`; comboEl.textContent = `Combo: ${combo}x`;
         particles.emitBurst(e.position.x, e.position.y, { count: 18, speed: [14, 34], life: [0.25, 0.55], size: [0.22, 0.8], color: 0xffaaaa });
         debris.burst(e.position.x, e.position.y, 8); SFX.play('explode');
-        addShake(0.6, 0.12);
+        addShake(0.6, 0.12, e.position.x, e.position.y);
         break;
       }
     }
@@ -892,7 +906,7 @@ function update(dt) {
           mods.shields -= 1;
           invuln = 1.0;
           particles.emitBurst(ship.position.x, ship.position.y, { count: 24, speed: [20, 40], life: [0.2, 0.5], size: [0.3, 1.2], color: 0x66ccff }); SFX.play('shield');
-          addShake(0.8, 0.2);
+          addShake(0.8, 0.2, ship.position.x, ship.position.y);
           break;
         } else {
           die();
@@ -914,7 +928,7 @@ function update(dt) {
       if (circleHit(ship.position.x, ship.position.y, ship.userData.radius, b.position.x, b.position.y, b.userData.radius)) {
         if (mods.shields > 0) {
           mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield');
-          scene.remove(b); eBullets.splice(i, 1); addShake(0.5, 0.12);
+          scene.remove(b); eBullets.splice(i, 1); addShake(0.5, 0.12, ship.position.x, ship.position.y);
         } else { die(); }
         break;
       }
@@ -934,7 +948,7 @@ function die() {
   gameOver = true;
   // visual pop
   ship.visible = false;
-  addShake(1.0, 0.5);
+  addShake(1.0, 0.5, ship.position.x, ship.position.y);
   finalScoreEl.textContent = `Final Score: ${score}`;
   gameoverEl.hidden = false;
   if (window.__status) window.__status.set('Crashed — Game Over');
@@ -1002,7 +1016,6 @@ function offerUpgrades() {
   const bag = []; for (const o of pool) for (let i=0;i<weight(o.rarity);i++) bag.push(o);
   const options = [];
   while (options.length < 3 && bag.length) { const i = Math.floor(Math.random()*bag.length); const pick = bag.splice(i,1)[0]; if (!options.includes(pick)) options.push(pick); }
-  choiceButtonsEl.innerHTML = '';
   choiceCardsEl.innerHTML = '';
   for (const opt of options) {
     const card = document.createElement('div');
