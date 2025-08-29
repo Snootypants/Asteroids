@@ -586,6 +586,8 @@ let invuln = 0; // seconds of spawn invulnerability
 let combo = 1;
 let comboTimer = 0; // time left to sustain combo
 let pausedForUpgrade = false;
+// Drone helpers
+let drones = [];
 const comboEl = document.getElementById('combo');
 
 const scoreEl = document.getElementById('score');
@@ -1017,12 +1019,14 @@ function offerUpgrades() {
   const options = [];
   while (options.length < 3 && bag.length) { const i = Math.floor(Math.random()*bag.length); const pick = bag.splice(i,1)[0]; if (!options.includes(pick)) options.push(pick); }
   choiceCardsEl.innerHTML = '';
+  // Simple inline SVG badge
+  const BADGE = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l5 3 3 5-3 5-5 3-5-3-3-5 3-5 5-3z" stroke="#bcd9ff" stroke-width="1.2" fill="rgba(120,160,255,0.15)"/></svg>';
   for (const opt of options) {
     const card = document.createElement('div');
     card.className = 'choice-card';
     card.dataset.rarity = opt.rarity || 'common';
     const syn = synergy(opt);
-    card.innerHTML = `<h3>${opt.label}</h3><p class="desc">${opt.desc}</p>${syn ? `<p class="syn">${syn}</p>`:''}`;
+    card.innerHTML = `<div class="icon">${BADGE}</div><h3>${opt.label}</h3><p class="desc">${opt.desc}</p>${syn ? `<p class=\"syn\">${syn}</p>`:''}`;
     card.onclick = () => { opt.apply(); SFX.play('upgrade'); resumeNextWave(); };
     choiceCardsEl.appendChild(card);
   }
