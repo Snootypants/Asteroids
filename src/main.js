@@ -368,6 +368,8 @@ const SFX = (() => {
         case 'shield': tone(440, 0.18, 'triangle'); break;
         case 'upgrade': tone(660, 0.2, 'square'); setTimeout(()=>tone(990,0.15,'square'),60); break;
         case 'gameover': tone(220, 0.3, 'sawtooth'); break;
+        case 'pickup': tone(880, 0.05, 'triangle'); break;
+        case 'shop': tone(520, 0.12, 'triangle'); break;
         default: break;
       }
     }
@@ -483,6 +485,7 @@ function createAsteroid(sizeKey, x, y, vx, vy) {
     vy: vy ?? rand(-ASTEROIDS.baseSpeed, ASTEROIDS.baseSpeed),
     rot: rand(-1, 1),
     radius: def.r * 0.9,
+    ore: chooseOreType(),
   };
   // Add edge lines for readability
   const egeo = new THREE.EdgesGeometry(geo, 20);
@@ -491,6 +494,14 @@ function createAsteroid(sizeKey, x, y, vx, vy) {
   scene.add(mesh);
   outlineTargets.push(mesh);
   return mesh;
+}
+
+function chooseOreType(){
+  const r = Math.random();
+  if (r > 0.995) return 'adam';
+  if (r > 0.97) return 'platinum';
+  if (r > 0.9) return 'gold';
+  return 'iron';
 }
 
 // Enemy hunter
@@ -664,6 +675,44 @@ function novaBlast() {
   }
   scoreEl.textContent = `Score: ${score}`;
   SFX.play('explode');
+}
+
+// Hangar Shop (every 3 waves)
+function openHangar(){
+  pausedForUpgrade = true; mouse.enabled=false; setReticle(0,0,false); SFX.play('shop');
+  if (!hangarEl) return; hangarEl.hidden=false; hangarEl.classList.add('show'); hangarEl.classList.remove('hide');
+  const pool = [
+    { key:'overclock', label:'Overclock', desc:'+60% fire rate', rarity:'epic', cost:{salv:80,gold:2} , apply:()=>mods.fireRateMul*=1.6 },
+    { key:'quantum', label:'Quantum Engine', desc:'+40% accel/speed', rarity:'epic', cost:{salv:80,plat:1} , apply:()=>mods.engineMul*=1.4 },
+    { key:'magnet', label:'Magnetic Collector', desc:'Bigger pickup radius', rarity:'uncommon', cost:{salv:40}, apply:()=>{mods.magnet=(mods.magnet||1)+0.6;} },
+    { key:'shield', label:'Shield Charge', desc:'+1 shield', rarity:'common', cost:{salv:30}, apply:()=>mods.shields+=1 },
+    { key:'drone', label:'Drone Buddy', desc:'+1 drone', rarity:'uncommon', cost:{salv:50,gold:1}, apply:()=>{ if(mods.drones<3){ addDrone(); mods.drones+=1; } } },
+    { key:'ricochet', label:'Ricochet Rounds', desc:'Bullets bounce once', rarity:'uncommon', cost:{salv:60}, apply:()=>{ if(mods.ricochet<1) mods.ricochet=1; } },
+  ];
+  // pick 4
+  const opts=[]; const bag=[...pool];
+  while(opts.length<4 && bag.length){ const i=Math.floor(Math.random()*bag.length); opts.push(bag.splice(i,1)[0]); }
+  shopCardsEl.innerHTML='';
+  for(const o of opts){
+    const card=document.createElement('div'); card.className='choice-card'; card.dataset.rarity=o.rarity||'common';
+    const ico=iconFor(o.key.replace(/\d+$/,''),84);
+    const costStr = [o.cost?.salv?`⛭ ${o.cost.salv}`:'', o.cost?.gold?`◆ ${o.cost.gold}`:'', o.cost?.plat?`◈ ${o.cost.plat}`:'', o.cost?.adam?`⬢ ${o.cost.adam}`:''].filter(Boolean).join(' · ');
+    card.innerHTML=`<div class="icon">${ico}</div><h3>${o.label}</h3><p>${o.desc}</p><p class="cost">${costStr}</p>`;
+    const canAfford = (salvage>=(o.cost?.salv||0)) && (gold>=(o.cost?.gold||0)) && (platinum>=(o.cost?.plat||0)) && (adamantium>=(o.cost?.adam||0));
+    if(!canAfford) card.classList.add('disabled');
+    card.onclick=()=>{
+      if(!canAfford) return; 
+      salvage -= (o.cost?.salv||0); gold-=(o.cost?.gold||0); platinum-=(o.cost?.plat||0); adamantium-=(o.cost?.adam||0); updateCurrencyHUD();
+      o.apply(); closeHangar(true);
+    };
+    shopCardsEl.appendChild(card);
+  }
+  if(leaveShopBtn) leaveShopBtn.onclick=()=>closeHangar(false);
+}
+
+function closeHangar(purchased){
+  if(!hangarEl) return; hangarEl.classList.remove('show'); hangarEl.classList.add('hide'); setTimeout(()=>hangarEl.hidden=true,350);
+  pausedForUpgrade=false; mouse.enabled=true; wave++; spawnWave();
 }
 
 function resetGame() {
@@ -910,8 +959,11 @@ function update(dt) {
     if (b.userData.life <= 0) { scene.remove(b); eBullets.splice(i, 1); continue; }
     b.position.x += b.userData.vx * dt; b.position.y += b.userData.vy * dt; wrap(b);
   }
+  // Update floating pickups
+  updatePickups(dt);
   // Run misc callbacks (beacons)
   for (const cb of Array.from(afterUpdates)) cb(dt);
+  
 
   // Bullet-asteroid collisions
   outer: for (let i = asteroids.length - 1; i >= 0; i--) {
@@ -934,11 +986,8 @@ function update(dt) {
         score += Math.round(def.score * mult);
         comboEl.textContent = `Combo: ${combo}x`;
         scoreEl.textContent = `Score: ${score}`;
-        // currency drops (simple proto)
-        const roll = Math.random();
-        salvage += Math.max(1, Math.round(def.r));
-        if (roll > 0.9) gold += 1; else if (roll > 0.97) platinum += 1; else if (roll > 0.995) adamantium += 1;
-        updateCurrencyHUD();
+        // spawn pickups
+        spawnDrops(a);
         // particles burst
         particles.emitBurst(a.position.x, a.position.y, { count: 16, speed: [12, 36], life: [0.25, 0.6], size: [0.25, 1.0], color: 0xaad0ff });
         debris.burst(a.position.x, a.position.y, Math.floor(def.r * 2));
@@ -1008,7 +1057,8 @@ function update(dt) {
 
   // Next wave
   if (asteroids.length === 0) {
-    offerUpgrades();
+    const nextWave = wave + 1;
+    if (nextWave % 3 === 0) openHangar(); else offerUpgrades();
   }
 
   updateShieldVisual();
@@ -1248,4 +1298,55 @@ function acquireTarget() {
     if (d2 < bestD) { bestD = d2; best = a; }
   }
   return best;
+}
+
+// Pickups (floating currency shards)
+function spawnDrops(a){
+  const def = ASTEROIDS[a.userData.size];
+  const base = Math.max(1, Math.round(def.r));
+  addPickup('salvage', base, a.position.x, a.position.y);
+  const ore = a.userData.ore || 'iron';
+  const roll = Math.random();
+  if (ore === 'gold' && roll > 0.3) addPickup('gold', 1, a.position.x, a.position.y);
+  if (ore === 'platinum' && roll > 0.4) addPickup('platinum', 1, a.position.x, a.position.y);
+  if (ore === 'adam' && roll > 0.6) addPickup('adam', 1, a.position.x, a.position.y);
+}
+
+function addPickup(kind, amount, x, y){
+  const color = kind==='gold'?0xffd77a: kind==='platinum'?0xd8f4ff: kind==='adam'?0xff9a7a:0xbde2ff;
+  const mat = new THREE.SpriteMaterial({ color, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending });
+  for(let i=0;i<amount;i++){
+    const s = new THREE.Sprite(mat.clone());
+    s.scale.set(0.8,0.8,1);
+    s.position.set(x,y,0);
+    s.userData={kind:'pickup',type:kind,vx:rand(-6,6),vy:rand(-6,6),age:0,collectible:0.25};
+    scene.add(s); pickups.push(s);
+  }
+}
+
+function updatePickups(dt){
+  const attractR = 6 * (mods.magnet || 1);
+  for(let i=pickups.length-1;i>=0;i--){
+    const p = pickups[i];
+    p.userData.age += dt;
+    p.position.x += p.userData.vx * dt; p.position.y += p.userData.vy * dt; p.userData.vx*=0.98; p.userData.vy*=0.98; wrap(p);
+    if (p.userData.age > p.userData.collectible){
+      const dx = ship.position.x - p.position.x; const dy = ship.position.y - p.position.y; const d = Math.hypot(dx,dy);
+      if (d < attractR){ p.userData.vx += (dx/d)*20*dt; p.userData.vy += (dy/d)*20*dt; }
+      if (d < 0.8){
+        collectPickup(p); scene.remove(p); pickups.splice(i,1); continue;
+      }
+    }
+    const t = Math.max(0,1 - p.userData.age/10); p.material.opacity = 0.4 + 0.6*t;
+  }
+}
+
+function collectPickup(p){
+  switch(p.userData.type){
+    case 'gold': gold += 1; break;
+    case 'platinum': platinum += 1; break;
+    case 'adam': adamantium += 1; break;
+    default: salvage += 1; break;
+  }
+  updateCurrencyHUD(); SFX.play('pickup');
 }

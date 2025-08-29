@@ -265,3 +265,8 @@ html, body {
 #audio input[type="range"] { width:120px; }
 #audio button { font-size:12px; padding:2px 8px; }
 #deathReason { margin: 4px 0 0; color: #ffd7d7; opacity:.9; }
+.overlay .leave { position: absolute; bottom: 40px; right: 40px; padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(140,170,255,0.35); background: rgba(10,12,18,0.6); color:#e8f0ff; cursor:pointer; }
+#hangar .cards { display:grid; grid-template-columns: repeat(4, 280px); gap: 28px; transform: translateY(-10px); }
+#hangar .choice-card { cursor:pointer; }
+#hangar .choice-card .cost { margin-top: 8px; font-size: 12px; opacity: .9; }
+#hangar .choice-card.disabled { filter: grayscale(0.6) brightness(0.7); cursor:not-allowed; }
