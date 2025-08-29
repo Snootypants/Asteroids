@@ -305,13 +305,29 @@ function setReticle(x, y, show = true) {
   reticleEl.hidden = !show;
 }
 
-// Simple SFX using WebAudio (oscillator based)
+// Simple SFX using WebAudio (oscillator based) with master volume/mute
 const SFX = (() => {
-  let ctx = null;
+  let ctx = null, master = null;
+  let volume = 0.8; let muted = false;
+  const storage = {
+    load() {
+      const v = localStorage.getItem('sfxVolume');
+      const m = localStorage.getItem('sfxMuted');
+      if (v !== null) volume = Math.max(0, Math.min(1, parseFloat(v)));
+      if (m !== null) muted = m === 'true';
+    },
+    save() { localStorage.setItem('sfxVolume', String(volume)); localStorage.setItem('sfxMuted', String(muted)); }
+  };
+  storage.load();
   function ensureCtx() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       ctx = AC ? new AC() : null;
+      if (ctx) {
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : volume;
+        master.connect(ctx.destination);
+      }
     }
   }
   function env(node, t = 0.15) {
@@ -326,13 +342,17 @@ const SFX = (() => {
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type; osc.frequency.value = freq;
-    osc.connect(g); g.connect(ctx.destination);
+    osc.connect(g); g.connect(master || ctx.destination);
     env(g, t);
     osc.start();
     osc.stop(ctx.currentTime + t);
   }
   const api = {
     unlock() { ensureCtx(); if (ctx && ctx.state === 'suspended') ctx.resume(); },
+    setVolume(v) { ensureCtx(); volume = Math.max(0, Math.min(1, v)); if (master) master.gain.value = muted ? 0 : volume; storage.save(); },
+    toggleMute() { ensureCtx(); muted = !muted; if (master) master.gain.value = muted ? 0 : volume; storage.save(); return muted; },
+    isMuted() { return muted; },
+    getVolume() { return volume; },
     play(name) {
       ensureCtx(); if (!ctx) return;
       switch (name) {
@@ -584,6 +604,19 @@ const scoreEl = document.getElementById('score');
 const waveEl = document.getElementById('wave');
 const gameoverEl = document.getElementById('gameover');
 const finalScoreEl = document.getElementById('finalScore');
+const sfxVolEl = document.getElementById('sfxVol');
+const sfxMuteEl = document.getElementById('sfxMute');
+
+// Initialize SFX controls
+if (sfxVolEl && sfxMuteEl) {
+  // Load persisted
+  const initVol = (typeof SFX.getVolume === 'function') ? SFX.getVolume() : 0.8;
+  const initMuted = (typeof SFX.isMuted === 'function') ? SFX.isMuted() : false;
+  sfxVolEl.value = Math.round(initVol * 100);
+  sfxMuteEl.textContent = initMuted ? 'Unmute' : 'Mute';
+  sfxVolEl.addEventListener('input', () => { SFX.setVolume(parseInt(sfxVolEl.value,10)/100); if (SFX.isMuted()) SFX.toggleMute(); sfxMuteEl.textContent = SFX.isMuted() ? 'Unmute' : 'Mute'; });
+  sfxMuteEl.addEventListener('click', () => { const m = SFX.toggleMute(); sfxMuteEl.textContent = m ? 'Unmute' : 'Mute'; });
+}
 
 function resetGame() {
   // clear scene of bullets/asteroids

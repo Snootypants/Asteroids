@@ -128,3 +128,9 @@ html, body {
   color: #ff98aa;
   text-shadow: 0 0 12px rgba(255,120,160,0.8);
 }
+
+/* SFX controls */
+#audio { display:flex; align-items:center; gap:6px; }
+#audio label { font-size:12px; opacity:.85; }
+#audio input[type="range"] { width:120px; }
+#audio button { font-size:12px; padding:2px 8px; }
