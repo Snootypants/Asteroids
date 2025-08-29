@@ -178,12 +178,12 @@ window.addEventListener('resize', onResize);
 const glowMat = new THREE.MeshStandardMaterial({ color: 0xa5c8ff, emissive: 0x335dff, emissiveIntensity: 1.7, roughness: 0.25, metalness: 0.0 });
 const bulletMat = new THREE.MeshStandardMaterial({ color: 0xffcc88, emissive: 0xff8800, emissiveIntensity: 2.0, roughness: 0.2, metalness: 0.1 });
 // Simple toon gradient texture
-function makeToonGradient() {
+function makeToonGradient(stopsIn) {
   const c = document.createElement('canvas');
   c.width = 4; c.height = 1;
   const ctx = c.getContext('2d');
   // Brighter stops for better readability
-  const stops = ['#6f8fc0', '#a9c4ea', '#dceafe', '#ffffff'];
+  const stops = stopsIn || ['#6f8fc0', '#a9c4ea', '#dceafe', '#ffffff'];
   for (let i = 0; i < 4; i++) { ctx.fillStyle = stops[i]; ctx.fillRect(i, 0, 1, 1); }
   const tex = new THREE.CanvasTexture(c);
   tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.needsUpdate = true;
@@ -213,6 +213,21 @@ function makeToonRimMaterial(color = 0xb9c9dc, gradient = toonGradient, rimColor
 }
 
 const asteroidBaseMat = makeToonRimMaterial(0xeff7ff, toonGradient, 0xffffff, 1.25, 1.8);
+
+// Palette variants for asteroids
+function asteroidMaterialVariant() {
+  const pick = Math.random();
+  if (pick < 0.33) {
+    // Ice
+    return makeToonRimMaterial(0xeaf6ff, makeToonGradient(['#88aee8','#b8d4ff','#e6f2ff','#ffffff']), 0xffffff, 1.3, 1.6);
+  } else if (pick < 0.66) {
+    // Crystal
+    return makeToonRimMaterial(0xf1e8ff, makeToonGradient(['#8b6fe0','#b79cff','#e9e1ff','#ffffff']), 0xf3eaff, 1.2, 1.8);
+  } else {
+    // Metal
+    return makeToonRimMaterial(0xe9f0f7, makeToonGradient(['#6f7f9a','#aeb9cc','#dfe7f1','#ffffff']), 0xffffff, 1.1, 1.6);
+  }
+}
 const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0x882222, emissiveIntensity: 1.0, roughness: 0.4, metalness: 0.1 });
 const enemyBulletMat = new THREE.MeshStandardMaterial({ color: 0xff8888, emissive: 0xff4444, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.1 });
 
@@ -280,6 +295,63 @@ class ParticleSystem {
 const particles = new ParticleSystem(350);
 console.log('[Asteroids] particles ready');
 if (window.__status) window.__status.log('Particles ready');
+
+// Reticle for mouse mode
+const reticleEl = document.getElementById('reticle');
+function setReticle(x, y, show = true) {
+  if (!reticleEl) return;
+  reticleEl.style.left = `${x}px`;
+  reticleEl.style.top = `${y}px`;
+  reticleEl.hidden = !show;
+}
+
+// Simple SFX using WebAudio (oscillator based)
+const SFX = (() => {
+  let ctx = null;
+  function ensureCtx() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = AC ? new AC() : null;
+    }
+  }
+  function env(node, t = 0.15) {
+    const now = ctx.currentTime;
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(0.0001, now);
+    node.gain.exponentialRampToValueAtTime(0.5, now + 0.01);
+    node.gain.exponentialRampToValueAtTime(0.0001, now + t);
+  }
+  function tone(freq = 440, t = 0.1, type = 'square') {
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    osc.connect(g); g.connect(ctx.destination);
+    env(g, t);
+    osc.start();
+    osc.stop(ctx.currentTime + t);
+  }
+  const api = {
+    unlock() { ensureCtx(); if (ctx && ctx.state === 'suspended') ctx.resume(); },
+    play(name) {
+      ensureCtx(); if (!ctx) return;
+      switch (name) {
+        case 'shoot': tone(880, 0.08, 'square'); break;
+        case 'ricochet': tone(1200, 0.06, 'triangle'); break;
+        case 'hit': tone(200, 0.12, 'sawtooth'); break;
+        case 'explode': tone(90, 0.2, 'sawtooth'); break;
+        case 'enemy_shoot': tone(520, 0.08, 'square'); break;
+        case 'shield': tone(440, 0.18, 'triangle'); break;
+        case 'upgrade': tone(660, 0.2, 'square'); setTimeout(()=>tone(990,0.15,'square'),60); break;
+        case 'gameover': tone(220, 0.3, 'sawtooth'); break;
+        default: break;
+      }
+    }
+  };
+  window.addEventListener('mousedown', api.unlock, { once: true });
+  window.addEventListener('keydown', api.unlock, { once: true });
+  return api;
+})();
 
 // Debris shards for asteroid breaks
 class DebrisSystem {
@@ -376,7 +448,7 @@ function makeAsteroidGeo(radius) {
 function createAsteroid(sizeKey, x, y, vx, vy) {
   const def = ASTEROIDS[sizeKey];
   const geo = makeAsteroidGeo(def.r);
-  const mat = asteroidBaseMat.clone();
+  const mat = asteroidMaterialVariant();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(x, y, 0);
   mesh.rotation.z = Math.random() * Math.PI * 2;
@@ -450,10 +522,35 @@ const afterUpdates = new Set();
 // Input
 const keys = new Set();
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.pointerLockElement === renderer.domElement) {
+    document.exitPointerLock?.();
+  }
   keys.add(e.key.toLowerCase());
   if (e.key === ' ') e.preventDefault();
 });
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+
+// Mouse mode and reticle
+const mouse = { enabled: false, locked: false, angle: Math.PI/2, lmb: false, rmb: false, sensitivity: 0.0035 };
+function toggleMouseMode(on) {
+  mouse.enabled = on;
+  if (on) { mouse.angle = ship.rotation.z; renderer.domElement.requestPointerLock?.(); }
+  else { document.exitPointerLock?.(); setReticle(0,0,false); }
+}
+document.addEventListener('pointerlockchange', () => {
+  mouse.locked = document.pointerLockElement === renderer.domElement;
+  if (!mouse.locked) { mouse.enabled = false; setReticle(0,0,false); }
+});
+window.addEventListener('mousemove', (e) => {
+  if (!mouse.enabled || !mouse.locked) return;
+  mouse.angle += e.movementX * mouse.sensitivity;
+  const cx = window.innerWidth/2, cy = window.innerHeight/2; const r = 36;
+  setReticle(cx + Math.cos(mouse.angle)*r, cy + Math.sin(mouse.angle)*r, true);
+});
+window.addEventListener('mousedown', (e) => { if (!mouse.enabled) return; if (e.button===0) mouse.lmb=true; if (e.button===2) mouse.rmb=true; });
+window.addEventListener('mouseup', (e) => { if (e.button===0) mouse.lmb=false; if (e.button===2) mouse.rmb=false; });
+window.addEventListener('contextmenu', (e) => { if (mouse.enabled) e.preventDefault(); });
+window.addEventListener('keydown', (e) => { if (e.key==='m' || e.key==='M') toggleMouseMode(!mouse.enabled); });
 
 // Debug toggle: press 't' to spawn a bright marker
 window.addEventListener('keydown', (e) => {
@@ -503,6 +600,11 @@ function resetGame() {
   ship.userData.vx = 0;
   ship.userData.vy = 0;
   ship.position.set(0, 0, 0);
+  // remove drones
+  if (typeof drones !== 'undefined') {
+    for (const d of drones) if (d.mesh) scene.remove(d.mesh);
+    drones = [];
+  }
   ship.rotation.z = Math.PI / 2; // pointing up (geometry aligned to +X)
   invuln = 2.0; // brief safety window
   spawnWave();
@@ -593,15 +695,19 @@ function update(dt) {
   invuln = Math.max(0, invuln - dt);
   // Ship controls
   const s = ship.userData;
+  if (mouse.enabled && mouse.locked) { ship.rotation.z = mouse.angle; }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
   const turnRight = keys.has('d') || keys.has('arrowright');
   const thrust = keys.has('w') || keys.has('arrowup');
   const fire = keys.has(' ');
 
-  if (turnLeft) ship.rotation.z += PLAYER.turn * dt;
-  if (turnRight) ship.rotation.z -= PLAYER.turn * dt;
+  if (!mouse.enabled) {
+    if (turnLeft) ship.rotation.z += PLAYER.turn * dt;
+    if (turnRight) ship.rotation.z -= PLAYER.turn * dt;
+  }
 
-  if (thrust) {
+  const thrusting = mouse.enabled ? mouse.rmb : thrust;
+  if (thrusting) {
     const ax = Math.cos(ship.rotation.z) * tunedAccel() * dt;
     const ay = Math.sin(ship.rotation.z) * tunedAccel() * dt;
     s.vx += ax; s.vy += ay;
@@ -633,12 +739,14 @@ function update(dt) {
 
   // Shooting
   s.fireCooldown -= dt;
-  if (fire && s.fireCooldown <= 0) {
+  const firing = mouse.enabled ? mouse.lmb : fire;
+  if (firing && s.fireCooldown <= 0) {
     shoot();
     s.fireCooldown = PLAYER.fireRate / mods.fireRateMul;
     addShake(0.15, 0.06);
     // muzzle flash
     particles.emitBurst(ship.position.x + Math.cos(ship.rotation.z) * 1.2, ship.position.y + Math.sin(ship.rotation.z) * 1.2, { count: 6, speed: [10, 26], life: [0.08, 0.18], size: [0.18, 0.5], color: 0xffe6aa });
+    SFX.play('shoot');
   }
 
   // Update bullets
@@ -651,6 +759,18 @@ function update(dt) {
     b.position.x += b.userData.vx * dt;
     b.position.y += b.userData.vy * dt;
     wrap(b);
+  }
+
+  // Ricochet handling for bullets at bounds
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    if (!b.userData || !b.userData.ricochet) continue;
+    const hw = WORLD.width * 0.5, hh = WORLD.height * 0.5; let bounced = false;
+    if (b.position.x > hw) { b.position.x = hw; b.userData.vx *= -1; bounced = true; }
+    if (b.position.x < -hw) { b.position.x = -hw; b.userData.vx *= -1; bounced = true; }
+    if (b.position.y > hh) { b.position.y = hh; b.userData.vy *= -1; bounced = true; }
+    if (b.position.y < -hh) { b.position.y = -hh; b.userData.vy *= -1; bounced = true; }
+    if (bounced) { b.userData.ricochet -= 1; particles.emitBurst(b.position.x, b.position.y, { count: 6, speed: [8, 18], life: [0.08, 0.18], size: [0.18, 0.4], color: 0xbbe0ff }); SFX.play('ricochet'); if (b.userData.ricochet <= 0) b.userData.ricochet = 0; }
   }
 
   // Update asteroids
@@ -674,7 +794,7 @@ function update(dt) {
     e.position.x += e.userData.vx * dt; e.position.y += e.userData.vy * dt; wrap(e);
     e.rotation.z = Math.atan2(dy, dx);
     e.userData.cool -= dt;
-    if (e.userData.cool <= 0 && dist < 45) { e.userData.cool = ENEMY.fireRate; eShoot(e.position.x + Math.cos(e.rotation.z) * 1.2, e.position.y + Math.sin(e.rotation.z) * 1.2, e.rotation.z); }
+    if (e.userData.cool <= 0 && dist < 45) { e.userData.cool = ENEMY.fireRate; eShoot(e.position.x + Math.cos(e.rotation.z) * 1.2, e.position.y + Math.sin(e.rotation.z) * 1.2, e.rotation.z); SFX.play('enemy_shoot'); }
   }
 
   // Update enemy bullets
@@ -714,6 +834,7 @@ function update(dt) {
         const kids = splitAsteroid(a);
         asteroids.push(...kids);
         addShake(0.5, 0.12);
+        if (kids.length === 0) SFX.play('explode'); else SFX.play('hit');
         break outer;
       }
     }
@@ -730,7 +851,7 @@ function update(dt) {
         combo += 1; comboTimer = 2.3; const mult = 1 + 0.2 * (combo - 1);
         score += Math.round(ENEMY.score * mult); scoreEl.textContent = `Score: ${score}`; comboEl.textContent = `Combo: ${combo}x`;
         particles.emitBurst(e.position.x, e.position.y, { count: 18, speed: [14, 34], life: [0.25, 0.55], size: [0.22, 0.8], color: 0xffaaaa });
-        debris.burst(e.position.x, e.position.y, 8);
+        debris.burst(e.position.x, e.position.y, 8); SFX.play('explode');
         addShake(0.6, 0.12);
         break;
       }
@@ -744,7 +865,7 @@ function update(dt) {
         if (mods.shields > 0) {
           mods.shields -= 1;
           invuln = 1.0;
-          particles.emitBurst(ship.position.x, ship.position.y, { count: 24, speed: [20, 40], life: [0.2, 0.5], size: [0.3, 1.2], color: 0x66ccff });
+          particles.emitBurst(ship.position.x, ship.position.y, { count: 24, speed: [20, 40], life: [0.2, 0.5], size: [0.3, 1.2], color: 0x66ccff }); SFX.play('shield');
           addShake(0.8, 0.2);
           break;
         } else {
@@ -756,7 +877,7 @@ function update(dt) {
     // enemy vs ship (ram)
     for (const e of enemies) {
       if (circleHit(e.position.x, e.position.y, ENEMY.radius, ship.position.x, ship.position.y, ship.userData.radius)) {
-        if (mods.shields > 0) { mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); addShake(0.6, 0.12); }
+        if (mods.shields > 0) { mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield'); addShake(0.6, 0.12); }
         else { die(); }
         break;
       }
@@ -766,7 +887,7 @@ function update(dt) {
       const b = eBullets[i];
       if (circleHit(ship.position.x, ship.position.y, ship.userData.radius, b.position.x, b.position.y, b.userData.radius)) {
         if (mods.shields > 0) {
-          mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff });
+          mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield');
           scene.remove(b); eBullets.splice(i, 1); addShake(0.5, 0.12);
         } else { die(); }
         break;
@@ -791,6 +912,7 @@ function die() {
   finalScoreEl.textContent = `Final Score: ${score}`;
   gameoverEl.hidden = false;
   if (window.__status) window.__status.set('Crashed — Game Over');
+  SFX.play('gameover');
 }
 
 // Restart
@@ -818,32 +940,49 @@ const mods = {
   spread: false,
   pierce: false,
   shields: 0,
+  ricochet: 0,
+  drones: 0,
 };
 
 function offerUpgrades() {
   if (pausedForUpgrade || gameOver) return;
   pausedForUpgrade = true;
   if (window.__status) window.__status.set('Upgrade — choose 1 of 3');
-  // build choices
+  // build choices with rarity & simple synergies
   const pool = [
-    { key: 'spread', label: 'Spread Shot', desc: '+2 side bullets', apply: () => mods.spread = true },
-    { key: 'pierce', label: 'Piercing Rounds', desc: 'Bullets pierce 1 target', apply: () => mods.pierce = true },
-    { key: 'fire', label: 'Rapid Fire', desc: 'Fire rate +30%', apply: () => mods.fireRateMul *= 1.3 },
-    { key: 'engine', label: 'Engine Boost', desc: 'Accel/Speed +20%', apply: () => mods.engineMul *= 1.2 },
-    { key: 'shield', label: 'Shield Charge', desc: 'Gain a 1-hit shield', apply: () => mods.shields += 1 },
-  ];
-  // pick 3 unique
+    { key: 'spread', label: 'Spread Shot', desc: '+2 side bullets', rarity: 'common', available: () => !mods.spread, apply: () => mods.spread = true },
+    { key: 'spread2', label: 'Wide Spread', desc: '+2 more side bullets', rarity: 'uncommon', available: () => !!mods.spread && mods.spread !== 'wide', apply: () => mods.spread = 'wide' },
+    { key: 'pierce', label: 'Piercing Rounds', desc: 'Bullets pierce 1 target', rarity: 'common', available: () => !mods.pierce, apply: () => mods.pierce = true },
+    { key: 'pierce2', label: 'Super Pierce', desc: 'Pierce 2 targets', rarity: 'uncommon', available: () => mods.pierce !== 'super', apply: () => mods.pierce = 'super' },
+    { key: 'fire', label: 'Rapid Fire', desc: 'Fire rate +30%', rarity: 'common', available: () => true, apply: () => mods.fireRateMul *= 1.3 },
+    { key: 'engine', label: 'Engine Boost', desc: 'Accel/Speed +20%', rarity: 'common', available: () => true, apply: () => mods.engineMul *= 1.2 },
+    { key: 'shield', label: 'Shield Charge', desc: 'Gain a 1-hit shield', rarity: 'common', available: () => true, apply: () => mods.shields += 1 },
+    { key: 'shield2', label: 'Overshield', desc: '+2 shields', rarity: 'uncommon', available: () => true, apply: () => mods.shields += 2 },
+    { key: 'ricochet', label: 'Ricochet Rounds', desc: 'Bullets bounce once on edges', rarity: 'uncommon', available: () => mods.ricochet < 1, apply: () => mods.ricochet = 1 },
+    { key: 'ricochet2', label: 'Super Ricochet', desc: 'Bullets bounce twice', rarity: 'rare', available: () => mods.ricochet < 2, apply: () => mods.ricochet = 2 },
+    { key: 'drone', label: 'Drone Buddy', desc: 'Add 1 auto-firing drone', rarity: 'uncommon', available: () => mods.drones < 3, apply: () => { addDrone(); mods.drones += 1; } },
+  ].filter(o => o.available());
+
+  const synergy = (opt) => {
+    if (opt.key.startsWith('ricochet') && mods.pierce) return 'Synergy: ricochet + pierce = multi-angles';
+    if (opt.key.startsWith('pierce') && mods.spread) return 'Synergy: spread + pierce = crowd shredder';
+    if (opt.key.startsWith('fire') && mods.engineMul > 1.0) return 'Synergy: mobility + ROF';
+    return '';
+  };
+
+  const weight = (r) => r === 'rare' ? 1 : r === 'uncommon' ? 2 : 5;
+  const bag = []; for (const o of pool) for (let i=0;i<weight(o.rarity);i++) bag.push(o);
   const options = [];
-  while (options.length < 3 && pool.length) {
-    const i = Math.floor(Math.random() * pool.length);
-    options.push(pool.splice(i, 1)[0]);
-  }
+  while (options.length < 3 && bag.length) { const i = Math.floor(Math.random()*bag.length); const pick = bag.splice(i,1)[0]; if (!options.includes(pick)) options.push(pick); }
   choiceButtonsEl.innerHTML = '';
   for (const opt of options) {
     const btn = document.createElement('button');
-    btn.textContent = `${opt.label} — ${opt.desc}`;
+    btn.dataset.rarity = opt.rarity || 'common';
+    const syn = synergy(opt);
+    btn.innerHTML = `${opt.label} — ${opt.desc}${syn ? `<small>${syn}</small>` : ''}`;
     btn.onclick = () => {
       opt.apply();
+      SFX.play('upgrade');
       resumeNextWave();
     };
     choiceButtonsEl.appendChild(btn);
@@ -881,10 +1020,17 @@ function shoot() {
   const oy = Math.sin(baseDir) * 1.4;
   const spawn = (dir) => {
     const b = createBullet(ship.position.x + ox, ship.position.y + oy, dir, ship.userData.vx, ship.userData.vy);
-    b.userData.pierce = mods.pierce ? 1 : 0;
+    b.userData.pierce = mods.pierce === 'super' ? 2 : (mods.pierce ? 1 : 0);
+    if (mods.ricochet > 0) b.userData.ricochet = mods.ricochet;
     bullets.push(b);
   };
-  if (mods.spread) {
+  if (mods.spread === 'wide') {
+    spawn(baseDir - 0.28);
+    spawn(baseDir - 0.12);
+    spawn(baseDir);
+    spawn(baseDir + 0.12);
+    spawn(baseDir + 0.28);
+  } else if (mods.spread) {
     spawn(baseDir - 0.18);
     spawn(baseDir);
     spawn(baseDir + 0.18);
@@ -896,3 +1042,53 @@ function shoot() {
 // Adjust engine parameters by mods each frame
 function tunedAccel() { return PLAYER.accel * mods.engineMul; }
 function tunedMaxSpeed() { return PLAYER.maxSpeed * mods.engineMul; }
+
+// Drones
+function addDrone() {
+  const geo = new THREE.SphereGeometry(0.5, 12, 12);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x92ffdd, emissive: 0x227755, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.1 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData = { t: Math.random()*Math.PI*2, cd: 0 };
+  scene.add(mesh);
+  drones.push({ mesh });
+  outlineTargets.push(mesh);
+}
+
+function updateDrones(dt) {
+  if (!drones.length) return;
+  const r = 3.2;
+  for (const d of drones) {
+    d.mesh.userData.t += dt * 2.4;
+    const t = d.mesh.userData.t;
+    d.mesh.position.set(ship.position.x + Math.cos(t)*r, ship.position.y + Math.sin(t)*r, 0);
+    d.mesh.userData.cd -= dt;
+    if (d.mesh.userData.cd <= 0) {
+      const target = acquireTarget();
+      if (target) {
+        d.mesh.userData.cd = 0.6;
+        const ang = Math.atan2(target.position.y - d.mesh.position.y, target.position.x - d.mesh.position.x);
+        const b = createBullet(d.mesh.position.x, d.mesh.position.y, ang, ship.userData.vx*0.2, ship.userData.vy*0.2);
+        b.userData.pierce = 0;
+        bullets.push(b);
+        particles.emitBurst(d.mesh.position.x, d.mesh.position.y, { count: 4, speed: [8,14], life: [0.08,0.16], size:[0.15,0.3], color:0x9fffe6 });
+        SFX.play('shoot');
+      } else {
+        d.mesh.userData.cd = 0.3;
+      }
+    }
+  }
+}
+
+function acquireTarget() {
+  let best = null, bestD = 1e9;
+  for (const e of enemies) {
+    const dx = e.position.x - ship.position.x; const dy = e.position.y - ship.position.y; const d2 = dx*dx + dy*dy;
+    if (d2 < bestD) { bestD = d2; best = e; }
+  }
+  if (best) return best;
+  for (const a of asteroids) {
+    const dx = a.position.x - ship.position.x; const dy = a.position.y - ship.position.y; const d2 = dx*dx + dy*dy;
+    if (d2 < bestD) { bestD = d2; best = a; }
+  }
+  return best;
+}

@@ -50,7 +50,7 @@
       <div id="score">Score: 0</div>
       <div id="wave">Wave: 1</div>
       <div id="combo" style="opacity:.8">Combo: 1x</div>
-      <div id="hint">W/A/D to move, Space to shoot. R to restart.</div>
+      <div id="hint">W/A/D to move, Space to shoot. R to restart. Press M for Mouse Mode (Lock: M, Release: Esc/M; LMB shoot, RMB thrust).</div>
     </div>
     <div id="gameover" hidden>
       <h1>Game Over</h1>
@@ -66,6 +66,8 @@
         <p class="sub">Upgrades apply for this run.</p>
       </div>
     </div>
+    <!-- Mouse-mode reticle -->
+    <div id="reticle" hidden></div>
     <script type="module" src="src/main.js"></script>
     <script>
       // Simple loader diagnostic: if the module didn't set the flag,
