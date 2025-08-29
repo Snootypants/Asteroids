@@ -109,7 +109,8 @@ html, body {
 #choices .cards {
   display: grid;
   grid-template-columns: repeat(3, 280px);
-  gap: 28px;
+  gap: 40px; /* more separation */
+  transform: translateY(-90px); /* move closer to center */
 }
 .choice-card {
   cursor: pointer;
@@ -128,7 +129,7 @@ html, body {
   display: grid;
   grid-template-rows: 96px auto auto;
   align-items: start;
-  transform: perspective(700px) rotateX(0) rotateY(0) translateY(0);
+  transform: perspective(900px) rotateX(0) rotateY(0) translateY(0);
   transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
   will-change: transform, box-shadow, filter;
   opacity: 0; transform: translateY(10px);
@@ -140,11 +141,8 @@ html, body {
 .choice-card h3 { margin: 0 0 6px; font-size: 20px; }
 .choice-card p { margin: 0; font-size: 13px; opacity: .9; }
 .choice-card .syn { opacity: .75; font-size: 12px; margin-top: 6px; }
-.choice-card:hover {
-  filter: brightness(1.08);
-  transform: perspective(700px) translateY(-2px) rotateX(1.2deg) rotateY(-1.2deg);
-  box-shadow: 0 14px 36px rgba(0,0,0,0.45), inset 0 0 46px rgba(100,140,255,0.10);
-}
+/* JS sets rotate based on mouse; hover increases brightness */
+.choice-card:hover { filter: brightness(1.1); }
 
 /* corner bolts */
 .choice-card::before {
@@ -155,6 +153,20 @@ html, body {
     0 0 0 1px rgba(150,170,255,0.15) inset,
     0 0 40px rgba(80,120,255,0.08) inset;
 }
+
+/* rarity glow behind the card */
+.choice-card::after {
+  content: '';
+  position: absolute; inset: -20px; border-radius: 20px; z-index: -1;
+  filter: blur(22px);
+  opacity: .35;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(160,170,185,0.8), rgba(0,0,0,0));
+}
+.choice-card[data-rarity="common"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(140,150,165,0.65), rgba(0,0,0,0)); }
+.choice-card[data-rarity="uncommon"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(80,220,160,0.75), rgba(0,0,0,0)); }
+.choice-card[data-rarity="rare"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(120,170,255,0.8), rgba(0,0,0,0)); }
+.choice-card[data-rarity="epic"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(190,120,255,0.85), rgba(0,0,0,0)); }
+.choice-card[data-rarity="legendary"]::after { background: radial-gradient(70% 70% at 50% 50%, rgba(255,170,60,0.95), rgba(255,120,0,0.6), rgba(0,0,0,0)); opacity: .6; filter: blur(28px); }
 .choice-card::after {
   content: '';
   position: absolute; width: 6px; height: 6px; border-radius: 50%;
@@ -166,7 +178,7 @@ html, body {
               calc(100% - 16px) calc(100% - 16px) 0 0 rgba(120,150,255,0.35);
 }
 
-.choice-card .icon { position: relative; justify-self: center; align-self: center; width: 96px; height: 96px; display: grid; place-items: center; }
+.choice-card .icon { position: relative; justify-self: center; align-self: center; width: 96px; height: 96px; display: grid; place-items: center; pointer-events: none; }
 .choice-card .icon svg { filter: drop-shadow(0 0 10px rgba(160,200,255,0.25)); }
 .choice-card:hover .icon { filter: drop-shadow(0 0 10px rgba(160,200,255,0.35)); }
 

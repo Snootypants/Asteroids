@@ -637,6 +637,24 @@ function pushTaken(opt) {
   takenEl.appendChild(item);
 }
 
+// Legendary nova blast: clear nearby threats and score
+function novaBlast() {
+  const r = 18;
+  for (let i = asteroids.length - 1; i >= 0; i--) {
+    const a = asteroids[i];
+    const dx = a.position.x - ship.position.x; const dy = a.position.y - ship.position.y;
+    if (dx*dx + dy*dy <= r*r) {
+      scene.remove(a); asteroids.splice(i, 1);
+      particles.emitBurst(a.position.x, a.position.y, { count: 24, speed: [16, 40], life: [0.25, 0.6], size: [0.25, 1.1], color: 0xffe0aa });
+      debris.burst(a.position.x, a.position.y, 12);
+      addShake(0.8, 0.2, a.position.x, a.position.y);
+      score += 50; // small bonus
+    }
+  }
+  scoreEl.textContent = `Score: ${score}`;
+  SFX.play('explode');
+}
+
 function resetGame() {
   // clear scene of bullets/asteroids
   for (const b of bullets) scene.remove(b);
@@ -1037,6 +1055,11 @@ function offerUpgrades() {
     { key: 'ricochet', label: 'Ricochet Rounds', desc: 'Bullets bounce once on edges', rarity: 'uncommon', available: () => mods.ricochet < 1, apply: () => mods.ricochet = 1 },
     { key: 'ricochet2', label: 'Super Ricochet', desc: 'Bullets bounce twice', rarity: 'rare', available: () => mods.ricochet < 2, apply: () => mods.ricochet = 2 },
     { key: 'drone', label: 'Drone Buddy', desc: 'Add 1 auto-firing drone', rarity: 'uncommon', available: () => mods.drones < 3, apply: () => { addDrone(); mods.drones += 1; } },
+    { key: 'overclock', label: 'Overclock', desc: 'Fire rate +60%', rarity: 'epic', available: () => true, apply: () => mods.fireRateMul *= 1.6 },
+    { key: 'quantum', label: 'Quantum Engine', desc: 'Accel/Speed +40%', rarity: 'epic', available: () => true, apply: () => mods.engineMul *= 1.4 },
+    { key: 'pierce3', label: 'Rail Pierce', desc: 'Pierce 4 targets', rarity: 'epic', available: () => mods.pierce !== 'ultra', apply: () => mods.pierce = 'ultra' },
+    { key: 'swarm', label: 'Drone Swarm', desc: '+2 drones', rarity: 'epic', available: () => mods.drones < 3, apply: () => { addDrone(); addDrone(); mods.drones = Math.min(3, mods.drones + 2); } },
+    { key: 'nova', label: 'Nova Burst', desc: 'Detonate a clearing blast now', rarity: 'legendary', available: () => true, apply: () => novaBlast() },
   ].filter(o => o.available());
 
   const synergy = (opt) => {
@@ -1074,6 +1097,29 @@ function offerUpgrades() {
   };
   const cleanup = () => window.removeEventListener('keydown', onKey);
   window.addEventListener('keydown', onKey);
+
+  // Mouse tilt towards cursor
+  const onMove = (ev) => {
+    const rect = choiceCardsEl.getBoundingClientRect();
+    const mx = ev.clientX, my = ev.clientY;
+    for (const card of choiceCardsEl.children) {
+      const r = card.getBoundingClientRect();
+      const cx = r.left + r.width/2; const cy = r.top + r.height/2;
+      const dx = (mx - cx) / r.width; const dy = (my - cy) / r.height;
+      const rx = Math.max(-1, Math.min(1, dy)) * -6; // tip towards mouse
+      const ry = Math.max(-1, Math.min(1, dx)) * 6;
+      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+    }
+  };
+  const onLeave = () => { for (const card of choiceCardsEl.children) card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)'; };
+  choiceCardsEl.addEventListener('mousemove', onMove);
+  choiceCardsEl.addEventListener('mouseleave', onLeave);
+  const prevCleanup = cleanup;
+  const cleanup = () => {
+    window.removeEventListener('keydown', onKey);
+    choiceCardsEl.removeEventListener('mousemove', onMove);
+    choiceCardsEl.removeEventListener('mouseleave', onLeave);
+  };
 }
 
 function resumeNextWave() {
