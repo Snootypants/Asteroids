@@ -57,6 +57,16 @@ html, body {
 #statusLine { font-weight: 600; margin-bottom: 6px; color: #a8c0ff; text-shadow: 0 0 8px rgba(140,170,255,0.35); }
 #statusLog { margin: 0; max-height: 30vh; overflow: auto; white-space: pre-wrap; color: #e7f0ff; opacity: .9; }
 
+#copyright {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  font-size: 12px;
+  color: rgba(210, 225, 255, 0.7);
+  text-shadow: 0 0 8px rgba(140,170,255,0.25);
+  user-select: none;
+}
+
 #choices {
   position: fixed;
   inset: 0;

@@ -85,7 +85,10 @@ Gameplay expansions
 
 ## License
 
-This project is provided as‑is for learning and iteration. If you need a specific OSS license, open an issue or PR and we can add one.
+All Rights Reserved. See `LICENSE` and `NOTICE` for details.
+
+- Copyright © 2025 Snootypants. All rights reserved.
+- Public viewing is allowed for evaluation. No copying, modification, or redistribution without explicit written permission from the owner.
 
 ## Acknowledgements
 
@@ -95,4 +98,3 @@ This project is provided as‑is for learning and iteration. If you need a speci
 ---
 
 Have ideas or requests? PRs and issues welcome.
-
