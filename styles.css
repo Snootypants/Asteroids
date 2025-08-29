@@ -66,30 +66,30 @@ html, body {
   backdrop-filter: blur(2px);
 }
 
-#choices .card {
+/* Upgrade cards layout */
+#choices .cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(240px, 320px));
+  gap: 16px;
+}
+.choice-card {
+  cursor: pointer;
   background: rgba(10,12,18,0.9);
   border: 1px solid rgba(120,150,255,0.25);
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 14px 16px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 0 40px rgba(80,120,255,0.08);
-  min-width: 320px;
-  text-align: center;
-}
-
-#choices h2 { margin: 6px 0 8px; color: #a8c0ff; text-shadow: 0 0 10px rgba(140,170,255,0.6); }
-#choices .sub { opacity: 0.6; font-size: 12px; margin-top: 8px; }
-
-.choices { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
-.choices button {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(140,170,255,0.35);
   color: #dbe6ff;
-  background: linear-gradient(180deg, rgba(40,60,110,0.45), rgba(25,35,70,0.45));
-  cursor: pointer;
 }
-.choices button:hover { filter: brightness(1.15); }
-.choices button:active { transform: translateY(1px); }
+.choice-card h3 { margin: 0 0 6px; font-size: 18px; }
+.choice-card p { margin: 0; font-size: 13px; opacity: .9; }
+.choice-card .syn { opacity: .75; font-size: 12px; margin-top: 6px; }
+.choice-card:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+/* Rarity accents for full-card feel */
+.choice-card[data-rarity="common"] { border-color: rgba(150,170,255,0.35); }
+.choice-card[data-rarity="uncommon"] { border-color: rgba(120,255,180,0.55); box-shadow: 0 0 16px rgba(120,255,180,0.15) inset; }
+.choice-card[data-rarity="rare"] { border-color: rgba(255,220,120,0.7); box-shadow: 0 0 18px rgba(255,220,120,0.2) inset, 0 0 10px rgba(255,220,120,0.1); text-shadow: 0 0 6px rgba(255,220,120,0.25); }
 
 /* Card rarity styling */
 .choices button[data-rarity="common"] {

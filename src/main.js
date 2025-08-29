@@ -296,13 +296,17 @@ const particles = new ParticleSystem(350);
 console.log('[Asteroids] particles ready');
 if (window.__status) window.__status.log('Particles ready');
 
-// Reticle for mouse mode
+// Reticle and mouse aiming (absolute cursor)
 const reticleEl = document.getElementById('reticle');
-function setReticle(x, y, show = true) {
-  if (!reticleEl) return;
-  reticleEl.style.left = `${x}px`;
-  reticleEl.style.top = `${y}px`;
-  reticleEl.hidden = !show;
+let mouseScreen = { x: window.innerWidth/2, y: window.innerHeight/2 };
+function setReticle(x, y, show = true) { if (!reticleEl) return; reticleEl.style.left = `${x}px`; reticleEl.style.top = `${y}px`; reticleEl.hidden = !show; }
+window.addEventListener('mousemove', (e) => { mouseScreen.x = e.clientX; mouseScreen.y = e.clientY; if (!pausedForUpgrade && !gameOver) setReticle(mouseScreen.x, mouseScreen.y, true); });
+function screenToWorld(sx, sy) {
+  const ndcX = (sx / window.innerWidth) * 2 - 1;
+  const ndcY = - (sy / window.innerHeight) * 2 + 1;
+  const wx = THREE.MathUtils.mapLinear(ndcX, -1, 1, camera.left, camera.right);
+  const wy = THREE.MathUtils.mapLinear(ndcY, -1, 1, camera.bottom, camera.top);
+  return new THREE.Vector3(wx, wy, 0);
 }
 
 // Simple SFX using WebAudio (oscillator based) with master volume/mute
@@ -550,27 +554,11 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-// Mouse mode and reticle
-const mouse = { enabled: false, locked: false, angle: Math.PI/2, lmb: false, rmb: false, sensitivity: 0.0035 };
-function toggleMouseMode(on) {
-  mouse.enabled = on;
-  if (on) { mouse.angle = ship.rotation.z; renderer.domElement.requestPointerLock?.(); }
-  else { document.exitPointerLock?.(); setReticle(0,0,false); }
-}
-document.addEventListener('pointerlockchange', () => {
-  mouse.locked = document.pointerLockElement === renderer.domElement;
-  if (!mouse.locked) { mouse.enabled = false; setReticle(0,0,false); }
-});
-window.addEventListener('mousemove', (e) => {
-  if (!mouse.enabled || !mouse.locked) return;
-  mouse.angle += e.movementX * mouse.sensitivity;
-  const cx = window.innerWidth/2, cy = window.innerHeight/2; const r = 36;
-  setReticle(cx + Math.cos(mouse.angle)*r, cy + Math.sin(mouse.angle)*r, true);
-});
-window.addEventListener('mousedown', (e) => { if (!mouse.enabled) return; if (e.button===0) mouse.lmb=true; if (e.button===2) mouse.rmb=true; });
+// Mouse buttons for fire/thrust
+const mouse = { enabled: true, lmb: false, rmb: false };
+window.addEventListener('mousedown', (e) => { if (pausedForUpgrade || gameOver) return; if (e.button===0) mouse.lmb=true; if (e.button===2) mouse.rmb=true; });
 window.addEventListener('mouseup', (e) => { if (e.button===0) mouse.lmb=false; if (e.button===2) mouse.rmb=false; });
-window.addEventListener('contextmenu', (e) => { if (mouse.enabled) e.preventDefault(); });
-window.addEventListener('keydown', (e) => { if (e.key==='m' || e.key==='M') toggleMouseMode(!mouse.enabled); });
+window.addEventListener('contextmenu', (e) => { if (!pausedForUpgrade && !gameOver) e.preventDefault(); });
 
 // Debug toggle: press 't' to spawn a bright marker
 window.addEventListener('keydown', (e) => {
@@ -728,7 +716,12 @@ function update(dt) {
   invuln = Math.max(0, invuln - dt);
   // Ship controls
   const s = ship.userData;
-  if (mouse.enabled && mouse.locked) { ship.rotation.z = mouse.angle; }
+  // Aim at current cursor position (world projection)
+  if (mouse.enabled && !pausedForUpgrade) {
+    const w = screenToWorld(mouseScreen.x, mouseScreen.y);
+    const ang = Math.atan2(w.y - ship.position.y, w.x - ship.position.x);
+    ship.rotation.z = ang;
+  }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
   const turnRight = keys.has('d') || keys.has('arrowright');
   const thrust = keys.has('w') || keys.has('arrowup');
@@ -739,7 +732,7 @@ function update(dt) {
     if (turnRight) ship.rotation.z -= PLAYER.turn * dt;
   }
 
-  const thrusting = mouse.enabled ? mouse.rmb : thrust;
+  const thrusting = mouse.rmb || thrust;
   if (thrusting) {
     const ax = Math.cos(ship.rotation.z) * tunedAccel() * dt;
     const ay = Math.sin(ship.rotation.z) * tunedAccel() * dt;
@@ -772,7 +765,7 @@ function update(dt) {
 
   // Shooting
   s.fireCooldown -= dt;
-  const firing = mouse.enabled ? mouse.lmb : fire;
+  const firing = mouse.lmb || fire;
   if (firing && s.fireCooldown <= 0) {
     shoot();
     s.fireCooldown = PLAYER.fireRate / mods.fireRateMul;
@@ -966,7 +959,7 @@ setInterval(() => {
 
 // Upgrades system
 const choicesEl = document.getElementById('choices');
-const choiceButtonsEl = document.getElementById('choiceButtons');
+const choiceCardsEl = document.getElementById('choiceCards');
 const mods = {
   fireRateMul: 1.0,
   engineMul: 1.0,
@@ -981,6 +974,8 @@ function offerUpgrades() {
   if (pausedForUpgrade || gameOver) return;
   pausedForUpgrade = true;
   if (window.__status) window.__status.set('Upgrade — choose 1 of 3');
+  // Pause mouse aim while choosing
+  mouse.enabled = false; setReticle(0,0,false);
   // build choices with rarity & simple synergies
   const pool = [
     { key: 'spread', label: 'Spread Shot', desc: '+2 side bullets', rarity: 'common', available: () => !mods.spread, apply: () => mods.spread = true },
@@ -1008,17 +1003,15 @@ function offerUpgrades() {
   const options = [];
   while (options.length < 3 && bag.length) { const i = Math.floor(Math.random()*bag.length); const pick = bag.splice(i,1)[0]; if (!options.includes(pick)) options.push(pick); }
   choiceButtonsEl.innerHTML = '';
+  choiceCardsEl.innerHTML = '';
   for (const opt of options) {
-    const btn = document.createElement('button');
-    btn.dataset.rarity = opt.rarity || 'common';
+    const card = document.createElement('div');
+    card.className = 'choice-card';
+    card.dataset.rarity = opt.rarity || 'common';
     const syn = synergy(opt);
-    btn.innerHTML = `${opt.label} — ${opt.desc}${syn ? `<small>${syn}</small>` : ''}`;
-    btn.onclick = () => {
-      opt.apply();
-      SFX.play('upgrade');
-      resumeNextWave();
-    };
-    choiceButtonsEl.appendChild(btn);
+    card.innerHTML = `<h3>${opt.label}</h3><p class="desc">${opt.desc}</p>${syn ? `<p class="syn">${syn}</p>`:''}`;
+    card.onclick = () => { opt.apply(); SFX.play('upgrade'); resumeNextWave(); };
+    choiceCardsEl.appendChild(card);
   }
   choicesEl.hidden = false;
 }
@@ -1029,6 +1022,7 @@ function resumeNextWave() {
   wave++;
   spawnWave();
   if (window.__status) window.__status.set(`Running — Wave ${wave}`);
+  mouse.enabled = true; // re-enable mouse aim
 }
 
 // Shield visual ring
