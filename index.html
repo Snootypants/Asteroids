@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Asteroids v1 — Three.js</title>
+    <link rel="preconnect" href="https://unpkg.com" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="status" role="status" aria-live="polite" data-show="1">
+      <div id="statusLine">Booting…</div>
+      <pre id="statusLog"></pre>
+    </div>
+    <script>
+      // Lightweight status overlay + global error handlers
+      (function(){
+        const line = document.getElementById('statusLine');
+        const logEl = document.getElementById('statusLog');
+        const api = {
+          set(msg){ line.textContent = msg; },
+          log(msg){ if(!msg) return; const t = new Date().toISOString().split('T')[1].slice(0,12); logEl.textContent += `[${t}] ${msg}\n`; logEl.scrollTop = logEl.scrollHeight; },
+          show(){ document.getElementById('status').dataset.show = '1'; },
+          hide(){ document.getElementById('status').dataset.show = '0'; },
+          toggle(){ const e=document.getElementById('status'); e.dataset.show = e.dataset.show === '1' ? '0':'1'; }
+        };
+        window.__status = api;
+        api.set('Loading modules…');
+        window.addEventListener('error', (e)=>{
+          api.set('Error: ' + (e && e.message || 'Unknown error'));
+          api.log((e && e.error && e.error.stack) || String(e.message || e));
+          window.__gameBoot = 'error';
+        });
+        window.addEventListener('unhandledrejection', (e)=>{
+          api.set('Unhandled promise rejection');
+          api.log(String(e.reason && (e.reason.stack || e.reason.message) || e.reason || e));
+          window.__gameBoot = 'error';
+        });
+        window.addEventListener('keydown', (e)=>{ if(e.key==='F1' || e.key==='`'){ e.preventDefault(); api.toggle(); }});
+      })();
+    </script>
+    <div id="hud">
+      <div id="score">Score: 0</div>
+      <div id="wave">Wave: 1</div>
+      <div id="combo" style="opacity:.8">Combo: 1x</div>
+      <div id="hint">W/A/D to move, Space to shoot. R to restart.</div>
+    </div>
+    <div id="gameover" hidden>
+      <h1>Game Over</h1>
+      <p id="finalScore"></p>
+      <p>Press R to restart</p>
+    </div>
+
+    <div id="choices" hidden>
+      <div class="card">
+        <h2>Upgrade</h2>
+        <p>Pick 1 of 3 to power up.</p>
+        <div id="choiceButtons" class="choices"></div>
+        <p class="sub">Upgrades apply for this run.</p>
+      </div>
+    </div>
+    <script type="module" src="src/main.js"></script>
+    <script>
+      // Simple loader diagnostic: if the module didn't set the flag,
+      // show a message and hint to check DevTools or network.
+      setTimeout(() => {
+        if (window.__gameBoot !== 'running') {
+          console.warn('[Asteroids] Module did not boot. Check DevTools > Console for import errors.');
+          const msg = document.createElement('div');
+          msg.style.position = 'fixed';
+          msg.style.bottom = '10px';
+          msg.style.right = '10px';
+          msg.style.padding = '10px 12px';
+          msg.style.border = '1px solid rgba(255,120,120,0.4)';
+          msg.style.background = 'rgba(30,10,10,0.7)';
+          msg.style.color = '#ffdada';
+          msg.style.zIndex = '99999';
+          msg.textContent = 'Game failed to start. Open DevTools > Console and share the red error lines.';
+          document.body.appendChild(msg);
+          if (window.__status) { window.__status.set('Module did not boot'); window.__status.show(); }
+        }
+      }, 800);
+    </script>
+  </body>
+  </html>

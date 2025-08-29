@@ -1,0 +1,98 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(1200px 800px at 50% 50%, #04040a, #020208 60%, #000 100%);
+  color: #bcd0ff;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+}
+
+#hud {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  gap: 6px;
+  user-select: none;
+  text-shadow: 0 0 6px rgba(120,170,255,0.6);
+}
+
+#hint {
+  opacity: 0.7;
+  font-size: 12px;
+}
+
+#gameover {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(2px);
+}
+
+/* Ensure the HTML hidden attribute actually hides overlays even with our display grid */
+[hidden] { display: none !important; }
+
+#status {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  width: 320px;
+  max-height: 45vh;
+  background: rgba(8,10,20,0.65);
+  border: 1px solid rgba(120,150,255,0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #cfe0ff;
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  opacity: 0.0;
+  pointer-events: none;
+  transition: opacity .15s ease-in-out;
+}
+#status[data-show="1"] { opacity: 1; pointer-events: auto; }
+#statusLine { font-weight: 600; margin-bottom: 6px; color: #a8c0ff; text-shadow: 0 0 8px rgba(140,170,255,0.35); }
+#statusLog { margin: 0; max-height: 30vh; overflow: auto; white-space: pre-wrap; color: #e7f0ff; opacity: .9; }
+
+#choices {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(2px);
+}
+
+#choices .card {
+  background: rgba(10,12,18,0.9);
+  border: 1px solid rgba(120,150,255,0.25);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 0 40px rgba(80,120,255,0.08);
+  min-width: 320px;
+  text-align: center;
+}
+
+#choices h2 { margin: 6px 0 8px; color: #a8c0ff; text-shadow: 0 0 10px rgba(140,170,255,0.6); }
+#choices .sub { opacity: 0.6; font-size: 12px; margin-top: 8px; }
+
+.choices { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+.choices button {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(140,170,255,0.35);
+  color: #dbe6ff;
+  background: linear-gradient(180deg, rgba(40,60,110,0.45), rgba(25,35,70,0.45));
+  cursor: pointer;
+}
+.choices button:hover { filter: brightness(1.15); }
+.choices button:active { transform: translateY(1px); }
+
+#gameover h1 {
+  margin: 0 0 8px 0;
+  color: #ff98aa;
+  text-shadow: 0 0 12px rgba(255,120,160,0.8);
+}
