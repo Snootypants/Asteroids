@@ -109,8 +109,8 @@ html, body {
 #choices .cards {
   display: grid;
   grid-template-columns: repeat(3, 280px);
-  gap: 40px; /* more separation */
-  transform: translateY(-90px); /* move closer to center */
+  gap: 64px; /* more separation */
+  transform: translateY(-30px); /* center-ish */
 }
 .choice-card {
   cursor: pointer;
@@ -157,16 +157,16 @@ html, body {
 /* rarity glow behind the card */
 .choice-card::after {
   content: '';
-  position: absolute; inset: -20px; border-radius: 20px; z-index: -1;
-  filter: blur(22px);
-  opacity: .35;
-  background: radial-gradient(60% 60% at 50% 50%, rgba(160,170,185,0.8), rgba(0,0,0,0));
+  position: absolute; inset: -40px; border-radius: 40px; z-index: -1;
+  filter: blur(46px);
+  opacity: .5;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(160,170,185,0.9), rgba(0,0,0,0));
 }
-.choice-card[data-rarity="common"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(140,150,165,0.65), rgba(0,0,0,0)); }
-.choice-card[data-rarity="uncommon"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(80,220,160,0.75), rgba(0,0,0,0)); }
-.choice-card[data-rarity="rare"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(120,170,255,0.8), rgba(0,0,0,0)); }
-.choice-card[data-rarity="epic"]::after { background: radial-gradient(60% 60% at 50% 50%, rgba(190,120,255,0.85), rgba(0,0,0,0)); }
-.choice-card[data-rarity="legendary"]::after { background: radial-gradient(70% 70% at 50% 50%, rgba(255,170,60,0.95), rgba(255,120,0,0.6), rgba(0,0,0,0)); opacity: .6; filter: blur(28px); }
+.choice-card[data-rarity="common"]::after { background: radial-gradient(65% 65% at 50% 50%, rgba(150,160,175,0.7), rgba(0,0,0,0)); }
+.choice-card[data-rarity="uncommon"]::after { background: radial-gradient(65% 65% at 50% 50%, rgba(80,220,160,0.85), rgba(0,0,0,0)); }
+.choice-card[data-rarity="rare"]::after { background: radial-gradient(65% 65% at 50% 50%, rgba(120,170,255,0.9), rgba(0,0,0,0)); }
+.choice-card[data-rarity="epic"]::after { background: radial-gradient(70% 70% at 50% 50%, rgba(190,120,255,0.95), rgba(0,0,0,0)); }
+.choice-card[data-rarity="legendary"]::after { background: radial-gradient(75% 75% at 50% 50%, rgba(255,170,60,0.98), rgba(255,120,0,0.7), rgba(0,0,0,0)); opacity: .75; filter: blur(58px); }
 .choice-card::after {
   content: '';
   position: absolute; width: 6px; height: 6px; border-radius: 50%;
@@ -248,3 +248,4 @@ html, body {
 #audio label { font-size:12px; opacity:.85; }
 #audio input[type="range"] { width:120px; }
 #audio button { font-size:12px; padding:2px 8px; }
+#deathReason { margin: 4px 0 0; color: #ffd7d7; opacity:.9; }

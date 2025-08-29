@@ -726,22 +726,22 @@ function removeFrom(arr, item) {
   if (i >= 0) arr.splice(i, 1);
 }
 
-// Camera shake
+// Camera shake (calmed further)
 let shakeTime = 0; let shakeMag = 0;
 function addShake(mag = 0.4, time = 0.1, ox = null, oy = null) {
-  // Global reduction by ~30%
-  let m = mag * 0.7;
+  // Global reduction by ~65%
+  let m = mag * 0.35;
   // Distance falloff if origin provided
   if (ox !== null && oy !== null) {
     const dx = (ox - ship.position.x); const dy = (oy - ship.position.y);
     const dist = Math.hypot(dx, dy);
     const maxR = Math.hypot(WORLD.width * 0.5, WORLD.height * 0.5);
     const falloff = Math.max(0, 1 - dist / maxR); // 1 near ship → 0 at far edge
-    m *= falloff;
+    m *= falloff * 0.9;
   }
   if (m <= 0.001) return;
   shakeMag = Math.max(shakeMag, m);
-  shakeTime = Math.max(shakeTime, time);
+  shakeTime = Math.max(shakeTime, time * 0.8);
 }
 
 // Game loop
@@ -961,7 +961,7 @@ function update(dt) {
           addShake(0.8, 0.2, ship.position.x, ship.position.y);
           break;
         } else {
-          die();
+          die('Asteroid collision');
         }
         break;
       }
@@ -969,8 +969,8 @@ function update(dt) {
     // enemy vs ship (ram)
     for (const e of enemies) {
       if (circleHit(e.position.x, e.position.y, ENEMY.radius, ship.position.x, ship.position.y, ship.userData.radius)) {
-        if (mods.shields > 0) { mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield'); addShake(0.6, 0.12); }
-        else { die(); }
+        if (mods.shields > 0) { mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield'); addShake(0.6, 0.12, ship.position.x, ship.position.y); }
+        else { die('Enemy collision'); }
         break;
       }
     }
@@ -981,7 +981,7 @@ function update(dt) {
         if (mods.shields > 0) {
           mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield');
           scene.remove(b); eBullets.splice(i, 1); addShake(0.5, 0.12, ship.position.x, ship.position.y);
-        } else { die(); }
+        } else { die('Enemy bullet'); }
         break;
       }
     }
@@ -995,13 +995,15 @@ function update(dt) {
   updateShieldVisual();
 }
 
-function die() {
+function die(reason = 'Destroyed') {
   if (gameOver) return;
   gameOver = true;
   // visual pop
   ship.visible = false;
   addShake(1.0, 0.5, ship.position.x, ship.position.y);
   finalScoreEl.textContent = `Final Score: ${score}`;
+  const deathEl = document.getElementById('deathReason');
+  if (deathEl) deathEl.textContent = `Cause: ${reason}`;
   gameoverEl.hidden = false;
   if (window.__status) window.__status.set('Crashed — Game Over');
   SFX.play('gameover');
@@ -1188,16 +1190,16 @@ function addDrone() {
 
 function updateDrones(dt) {
   if (!drones.length) return;
-  const r = 3.2;
+  const r = 4.2;
   for (const d of drones) {
-    d.mesh.userData.t += dt * 2.4;
+    d.mesh.userData.t += dt * 3.5;
     const t = d.mesh.userData.t;
     d.mesh.position.set(ship.position.x + Math.cos(t)*r, ship.position.y + Math.sin(t)*r, 0);
     d.mesh.userData.cd -= dt;
     if (d.mesh.userData.cd <= 0) {
       const target = acquireTarget();
       if (target) {
-        d.mesh.userData.cd = 0.6;
+        d.mesh.userData.cd = 0.5;
         const ang = Math.atan2(target.position.y - d.mesh.position.y, target.position.x - d.mesh.position.x);
         const b = createBullet(d.mesh.position.x, d.mesh.position.y, ang, ship.userData.vx*0.2, ship.userData.vy*0.2);
         b.userData.pierce = 0;
@@ -1205,7 +1207,7 @@ function updateDrones(dt) {
         particles.emitBurst(d.mesh.position.x, d.mesh.position.y, { count: 4, speed: [8,14], life: [0.08,0.16], size:[0.15,0.3], color:0x9fffe6 });
         SFX.play('shoot');
       } else {
-        d.mesh.userData.cd = 0.3;
+        d.mesh.userData.cd = 0.25;
       }
     }
   }
