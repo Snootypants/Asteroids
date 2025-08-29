@@ -1095,7 +1095,7 @@ function offerUpgrades() {
     if (e.key === '2' && optionsSynced[1]) { optionsSynced[1].apply(); pushTaken(optionsSynced[1]); SFX.play('upgrade'); cleanup(); resumeNextWave(); }
     if (e.key === '3' && optionsSynced[2]) { optionsSynced[2].apply(); pushTaken(optionsSynced[2]); SFX.play('upgrade'); cleanup(); resumeNextWave(); }
   };
-  const cleanup = () => window.removeEventListener('keydown', onKey);
+  let cleanup = () => { window.removeEventListener('keydown', onKey); };
   window.addEventListener('keydown', onKey);
 
   // Mouse tilt towards cursor
@@ -1114,8 +1114,7 @@ function offerUpgrades() {
   const onLeave = () => { for (const card of choiceCardsEl.children) card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)'; };
   choiceCardsEl.addEventListener('mousemove', onMove);
   choiceCardsEl.addEventListener('mouseleave', onLeave);
-  const prevCleanup = cleanup;
-  const cleanup = () => {
+  cleanup = () => {
     window.removeEventListener('keydown', onKey);
     choiceCardsEl.removeEventListener('mousemove', onMove);
     choiceCardsEl.removeEventListener('mouseleave', onLeave);
