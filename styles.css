@@ -75,12 +75,16 @@ html, body {
   background: rgba(0,0,0,0.45);
   backdrop-filter: blur(2px);
 }
+/* Heading */
+#choices .heading { text-align: center; margin-bottom: 24px; }
+#choices .heading h1 { margin: 0; letter-spacing: 4px; font-size: 40px; color: #dfeaff; text-shadow: 0 8px 40px rgba(120,160,255,0.35), 0 0 12px rgba(120,160,255,0.25); }
+#choices .heading p { margin: 6px 0 0; opacity: .8; }
 
 /* Upgrade cards layout */
 #choices .cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 320px));
-  gap: 16px;
+  grid-template-columns: repeat(3, minmax(340px, 420px));
+  gap: 32px;
 }
 .choice-card {
   cursor: pointer;
@@ -89,15 +93,20 @@ html, body {
     repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 2px, rgba(0,0,0,0.02) 2px 6px);
   border: 1px solid rgba(120,150,255,0.25);
   border-radius: 12px;
-  padding: 14px 16px;
+  padding: 18px 22px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 0 40px rgba(80,120,255,0.08);
   color: #dbe6ff;
   position: relative;
   transform: perspective(600px) rotateX(0) rotateY(0) translateY(0);
   transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
   will-change: transform, box-shadow, filter;
+  opacity: 0; transform: translateY(10px);
+  animation: popIn .22s ease forwards;
 }
-.choice-card h3 { margin: 0 0 6px; font-size: 18px; }
+.choice-card:nth-child(1) { animation-delay: .02s; }
+.choice-card:nth-child(2) { animation-delay: .08s; }
+.choice-card:nth-child(3) { animation-delay: .14s; }
+.choice-card h3 { margin: 0 0 8px; font-size: 22px; }
 .choice-card p { margin: 0; font-size: 13px; opacity: .9; }
 .choice-card .syn { opacity: .75; font-size: 12px; margin-top: 6px; }
 .choice-card:hover {
@@ -128,6 +137,8 @@ html, body {
 
 .choice-card .icon { position:absolute; right:12px; top:10px; opacity:.9; }
 .choice-card:hover .icon { filter: drop-shadow(0 0 6px rgba(160,200,255,0.35)); }
+
+@keyframes popIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Subtle rarity pulses */
 @keyframes glowGreen { from { box-shadow: 0 0 0 1px rgba(120,255,180,0.25) inset, 0 0 32px rgba(120,255,180,0.12) inset; } to { box-shadow: 0 0 0 1px rgba(120,255,180,0.4) inset, 0 0 40px rgba(120,255,180,0.22) inset; } }
