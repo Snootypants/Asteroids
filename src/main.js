@@ -296,7 +296,7 @@ const particles = new ParticleSystem(350);
 console.log('[Asteroids] particles ready');
 if (window.__status) window.__status.log('Particles ready');
 
-// Reticle and mouse aiming (absolute cursor)
+// Reticle and mouse aiming (absolute cursor) + UI hookups
 const reticleEl = document.getElementById('reticle');
 let mouseScreen = { x: window.innerWidth/2, y: window.innerHeight/2 };
 function setReticle(x, y, show = true) { if (!reticleEl) return; reticleEl.style.left = `${x}px`; reticleEl.style.top = `${y}px`; reticleEl.hidden = !show; }
@@ -596,6 +596,9 @@ const gameoverEl = document.getElementById('gameover');
 const finalScoreEl = document.getElementById('finalScore');
 const sfxVolEl = document.getElementById('sfxVol');
 const sfxMuteEl = document.getElementById('sfxMute');
+const frameEl = document.getElementById('frameCounter');
+const toggleLogBtn = document.getElementById('toggleLog');
+const takenEl = document.getElementById('taken');
 
 // Initialize SFX controls
 if (sfxVolEl && sfxMuteEl) {
@@ -606,6 +609,28 @@ if (sfxVolEl && sfxMuteEl) {
   sfxMuteEl.textContent = initMuted ? 'Unmute' : 'Mute';
   sfxVolEl.addEventListener('input', () => { SFX.setVolume(parseInt(sfxVolEl.value,10)/100); if (SFX.isMuted()) SFX.toggleMute(); sfxMuteEl.textContent = SFX.isMuted() ? 'Unmute' : 'Mute'; });
   sfxMuteEl.addEventListener('click', () => { const m = SFX.toggleMute(); sfxMuteEl.textContent = m ? 'Unmute' : 'Mute'; });
+}
+// Log toggle button always available
+if (toggleLogBtn) toggleLogBtn.onclick = () => { const s = document.getElementById('status'); if (s) s.dataset.show = s.dataset.show === '1' ? '0' : '1'; };
+
+// Upgrade history stack
+const ICONS = {
+  spread: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h6M14 6l4 6-4 6" stroke="#bde2ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pierce: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="12" r="2" stroke="#bde2ff"/><circle cx="12" cy="12" r="2" stroke="#bde2ff"/><circle cx="18" cy="12" r="2" stroke="#bde2ff"/></svg>',
+  fire: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3c2 3-1 4 1 7 1 2 0 4-1 5-3 0-5-2-5-5 0-3 3-5 5-7z" fill="#ffcf88" stroke="#ffc070"/></svg>',
+  engine: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 12h10l4-3v6l-4-3H4z" stroke="#bde2ff"/></svg>',
+  shield: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l7 3v5c0 5-7 10-7 10S5 16 5 11V6l7-3z" stroke="#9fe2ff"/></svg>',
+  ricochet: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4v6h6M14 14h6v6" stroke="#bde2ff"/></svg>',
+  drone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" stroke="#9fffe6"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4" stroke="#9fffe6"/></svg>'
+};
+function pushTaken(opt) {
+  if (!takenEl) return;
+  const item = document.createElement('div');
+  item.className = 'taken-item';
+  const key = opt.key.replace(/\d+$/, '');
+  const ico = ICONS[key] || ICONS.fire;
+  item.innerHTML = `<div class="ico">${ico}</div><div class="txt">${opt.label}</div>`;
+  takenEl.appendChild(item);
 }
 
 function resetGame() {
@@ -703,6 +728,7 @@ resetGame();
 window.__gameBoot = 'running';
 console.log('[Asteroids] game loop starting');
 if (window.__status) window.__status.set('Running — Wave 1');
+let frames = 0;
 
 function tick() {
   const now = performance.now() / 1000;
@@ -722,6 +748,8 @@ function tick() {
 
   particles.update(dt);
   debris.update(dt);
+  // frame counter (debug)
+  frames++; if (frameEl) frameEl.textContent = String(frames);
   composer.render();
   requestAnimationFrame(tick);
 }
@@ -1019,6 +1047,7 @@ function offerUpgrades() {
   const options = [];
   while (options.length < 3 && bag.length) { const i = Math.floor(Math.random()*bag.length); const pick = bag.splice(i,1)[0]; if (!options.includes(pick)) options.push(pick); }
   choiceCardsEl.innerHTML = '';
+  const optionsSynced = options.slice();
   // Simple inline SVG badge
   const BADGE = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l5 3 3 5-3 5-5 3-5-3-3-5 3-5 5-3z" stroke="#bcd9ff" stroke-width="1.2" fill="rgba(120,160,255,0.15)"/></svg>';
   for (const opt of options) {
@@ -1027,10 +1056,20 @@ function offerUpgrades() {
     card.dataset.rarity = opt.rarity || 'common';
     const syn = synergy(opt);
     card.innerHTML = `<div class="icon">${BADGE}</div><h3>${opt.label}</h3><p class="desc">${opt.desc}</p>${syn ? `<p class=\"syn\">${syn}</p>`:''}`;
-    card.onclick = () => { opt.apply(); SFX.play('upgrade'); resumeNextWave(); };
+    card.onclick = () => { opt.apply(); pushTaken(opt); SFX.play('upgrade'); cleanup(); resumeNextWave(); };
     choiceCardsEl.appendChild(card);
   }
   choicesEl.hidden = false;
+
+  // Keyboard selection: 1/2/3
+  const onKey = (e) => {
+    if (!pausedForUpgrade) return;
+    if (e.key === '1' && optionsSynced[0]) { optionsSynced[0].apply(); pushTaken(optionsSynced[0]); SFX.play('upgrade'); cleanup(); resumeNextWave(); }
+    if (e.key === '2' && optionsSynced[1]) { optionsSynced[1].apply(); pushTaken(optionsSynced[1]); SFX.play('upgrade'); cleanup(); resumeNextWave(); }
+    if (e.key === '3' && optionsSynced[2]) { optionsSynced[2].apply(); pushTaken(optionsSynced[2]); SFX.play('upgrade'); cleanup(); resumeNextWave(); }
+  };
+  const cleanup = () => window.removeEventListener('keydown', onKey);
+  window.addEventListener('keydown', onKey);
 }
 
 function resumeNextWave() {
