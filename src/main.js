@@ -599,6 +599,17 @@ const sfxMuteEl = document.getElementById('sfxMute');
 const frameEl = document.getElementById('frameCounter');
 const toggleLogBtn = document.getElementById('toggleLog');
 const takenEl = document.getElementById('taken');
+const startOverlay = document.getElementById('startOverlay');
+const endOverlay = document.getElementById('endOverlay');
+const endStatsEl = document.getElementById('endStats');
+
+// Currencies
+let salvage=0, gold=0, platinum=0, adamantium=0;
+const salvageEl = document.getElementById('salvageCount');
+const goldEl = document.getElementById('goldCount');
+const platEl = document.getElementById('platCount');
+const adamEl = document.getElementById('adamCount');
+function updateCurrencyHUD(){ if(salvageEl) salvageEl.textContent=salvage; if(goldEl) goldEl.textContent=gold; if(platEl) platEl.textContent=platinum; if(adamEl) adamEl.textContent=adamantium; }
 
 // Initialize SFX controls
 if (sfxVolEl && sfxMuteEl) {
@@ -746,7 +757,10 @@ function addShake(mag = 0.4, time = 0.1, ox = null, oy = null) {
 
 // Game loop
 let last = performance.now() / 1000;
-resetGame();
+let started = false;
+function startRun(){ if(started) return; started = true; if(startOverlay){ startOverlay.classList.remove('show'); startOverlay.classList.add('hide'); setTimeout(()=>startOverlay.hidden=true,350);} resetGame(); }
+// click anywhere on start overlay to begin
+if(startOverlay){ startOverlay.addEventListener('click', startRun); }
 window.__gameBoot = 'running';
 console.log('[Asteroids] game loop starting');
 if (window.__status) window.__status.set('Running — Wave 1');
@@ -920,6 +934,11 @@ function update(dt) {
         score += Math.round(def.score * mult);
         comboEl.textContent = `Combo: ${combo}x`;
         scoreEl.textContent = `Score: ${score}`;
+        // currency drops (simple proto)
+        const roll = Math.random();
+        salvage += Math.max(1, Math.round(def.r));
+        if (roll > 0.9) gold += 1; else if (roll > 0.97) platinum += 1; else if (roll > 0.995) adamantium += 1;
+        updateCurrencyHUD();
         // particles burst
         particles.emitBurst(a.position.x, a.position.y, { count: 16, speed: [12, 36], life: [0.25, 0.6], size: [0.25, 1.0], color: 0xaad0ff });
         debris.burst(a.position.x, a.position.y, Math.floor(def.r * 2));
@@ -1004,7 +1023,11 @@ function die(reason = 'Destroyed') {
   finalScoreEl.textContent = `Final Score: ${score}`;
   const deathEl = document.getElementById('deathReason');
   if (deathEl) deathEl.textContent = `Cause: ${reason}`;
-  gameoverEl.hidden = false;
+  gameoverEl.hidden = true;
+  if (endOverlay) {
+    if (endStatsEl) endStatsEl.textContent = `Score ${score} • Salvage ${salvage} • Gold ${gold} • Plat ${platinum} • Adam ${adamantium}`;
+    endOverlay.hidden = false; endOverlay.classList.add('show'); endOverlay.classList.remove('hide');
+  }
   if (window.__status) window.__status.set('Crashed — Game Over');
   SFX.play('gameover');
 }

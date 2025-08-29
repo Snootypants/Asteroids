@@ -57,6 +57,13 @@
         <button id="sfxMute" type="button">Mute</button>
       </div>
     </div>
+    <!-- Currencies HUD -->
+    <div id="currencies">
+      <span class="c salvage" title="Salvage">⛭ <b id="salvageCount">0</b></span>
+      <span class="c gold" title="Gold">◆ <b id="goldCount">0</b></span>
+      <span class="c platinum" title="Platinum">◈ <b id="platCount">0</b></span>
+      <span class="c adam" title="Adamantium">⬢ <b id="adamCount">0</b></span>
+    </div>
     <!-- Taken upgrades stack -->
     <div id="taken"></div>
     <div id="gameover" hidden>
@@ -77,6 +84,15 @@
     <div id="reticle" hidden></div>
     <div id="frameCounter">0</div>
     <button id="toggleLog" title="Toggle Log">Log</button>
+    <!-- End screen overlay -->
+    <div id="endOverlay" class="overlay" hidden>
+      <img src="assets/gameEnd.png" alt="Game Over" class="overlay-img"/>
+      <div class="overlay-center">
+        <h1>Run Over</h1>
+        <p id="endStats"></p>
+        <p>Press R to restart</p>
+      </div>
+    </div>
     <div id="copyright">© 2025 Snootypants. All rights reserved.</div>
     <script type="module" src="src/main.js"></script>
     <script>
@@ -86,6 +102,14 @@
         if (window.__gameBoot !== 'running') {
           console.warn('[Asteroids] Module did not boot. Check DevTools > Console for import errors.');
           const msg = document.createElement('div');
+    <!-- Start screen overlay -->
+    <div id="startOverlay" class="overlay show">
+      <img src="assets/start_screen.png" alt="Start Screen" class="overlay-img"/>
+      <div class="overlay-center">
+        <h1>Asteroids Roguelite</h1>
+        <p>Click to start • WASD/Mouse • Space to shoot • R to restart</p>
+      </div>
+    </div>
           msg.style.position = 'fixed';
           msg.style.bottom = '10px';
           msg.style.right = '10px';
