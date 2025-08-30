@@ -16,6 +16,9 @@ html, body {
 .overlay-center h1 { margin: 0 0 8px; font-size: 44px; letter-spacing: 3px; color: #e8f0ff; text-shadow: 0 12px 60px rgba(120,160,255,0.35), 0 0 14px rgba(120,160,255,0.2); }
 .overlay-center p { margin: 0; opacity: .9; }
 
+/* Blur game canvas when overlays are open */
+#game-canvas.blurred { filter: blur(3px) brightness(0.9) saturate(0.95); transition: filter .25s ease; }
+
 #hud {
   position: fixed;
   top: 12px;

@@ -613,6 +613,15 @@ const takenEl = document.getElementById('taken');
 const startOverlay = document.getElementById('startOverlay');
 const endOverlay = document.getElementById('endOverlay');
 const endStatsEl = document.getElementById('endStats');
+const hangarEl = document.getElementById('hangar');
+const shopCardsEl = document.getElementById('shopCards');
+const leaveHangarBtn = document.getElementById('leaveHangar');
+const rerollBtn = document.getElementById('rerollShop');
+const banishBtn = document.getElementById('banishOne');
+const toggleVisBtn = document.getElementById('toggleVis');
+const rerollCostEl = document.getElementById('rerollCost');
+
+function setCanvasBlur(on){ const c = document.getElementById('game-canvas'); if(!c) return; if(on) c.classList.add('blurred'); else c.classList.remove('blurred'); }
 
 // Currencies
 let salvage=0, gold=0, platinum=0, adamantium=0;
@@ -679,7 +688,7 @@ function novaBlast() {
 
 // Hangar Shop (every 3 waves)
 function openHangar(){
-  pausedForUpgrade = true; mouse.enabled=false; setReticle(0,0,false); SFX.play('shop');
+  pausedForUpgrade = true; mouse.enabled=false; setReticle(0,0,false); SFX.play('shop'); setCanvasBlur(true);
   if (!hangarEl) return; hangarEl.hidden=false; hangarEl.classList.add('show'); hangarEl.classList.remove('hide');
   const pool = [
     { key:'overclock', label:'Overclock', desc:'+60% fire rate', rarity:'epic', cost:{salv:80,gold:2} , apply:()=>mods.fireRateMul*=1.6 },
@@ -703,10 +712,14 @@ function openHangar(){
     shopCardsEl.appendChild(btn);
   }
   attachCard3DInteractions(shopCardsEl);
+  // keyboard quick-pick 1-4
+  const onKey=(e)=>{const items=[...shopCardsEl.querySelectorAll('.card-btn')]; if(e.key==='1'&&items[0]) items[0].click(); if(e.key==='2'&&items[1]) items[1].click(); if(e.key==='3'&&items[2]) items[2].click(); if(e.key==='4'&&items[3]) items[3].click();};
+  window.addEventListener('keydown', onKey, { once:true });
 }
 
 function closeHangar(purchased){
   if(!hangarEl) return; hangarEl.classList.remove('show'); hangarEl.classList.add('hide'); setTimeout(()=>hangarEl.hidden=true,350);
+  setCanvasBlur(false);
   pausedForUpgrade=false; mouse.enabled=true; wave++; spawnWave();
 }
 
