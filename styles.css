@@ -68,13 +68,14 @@ html, body {
 
 #status {
   position: fixed;
-  top: 8px;
-  right: 8px;
-  width: 320px;
-  max-height: 45vh;
-  background: rgba(8,10,20,0.65);
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(90vw, 560px);
+  max-height: 40vh;
+  background: rgba(8,10,20,0.7);
   border: 1px solid rgba(120,150,255,0.25);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px 10px;
   font-size: 12px;
   color: #cfe0ff;
@@ -83,6 +84,7 @@ html, body {
   opacity: 0.0;
   pointer-events: none;
   transition: opacity .15s ease-in-out;
+  z-index: 10003;
 }
 #status[data-show="1"] { opacity: 1; pointer-events: auto; }
 #statusLine { font-weight: 600; margin-bottom: 6px; color: #a8c0ff; text-shadow: 0 0 8px rgba(140,170,255,0.35); }

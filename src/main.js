@@ -590,6 +590,7 @@ let bullets = [];
 let asteroids = [];
 let enemies = [];
 let eBullets = [];
+let pickups = [];
 let score = 0;
 let wave = 1;
 let gameOver = false;
@@ -730,6 +731,7 @@ function resetGame() {
   bullets = [];
   asteroids = [];
   for (const eb of eBullets) scene.remove(eb); eBullets = [];
+  for (const p of pickups) scene.remove(p); pickups = [];
   for (const en of enemies) scene.remove(en); enemies = [];
   score = 0;
   wave = 1;
