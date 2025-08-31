@@ -30,8 +30,8 @@ html, body {
 }
 
 /* Currency HUD */
-#currencies { position: fixed; top: 10px; right: 90px; display: grid; grid-auto-flow: column; gap: 12px; z-index: 10; }
-#currencies .c { font-size: 13px; opacity: .9; text-shadow: 0 0 8px rgba(140,170,255,0.35); }
+#currencies { position: fixed; top: 10px; right: 90px; display: grid; grid-auto-flow: column; gap: 16px; z-index: 10; }
+#currencies .c { font-size: 16px; font-weight: bold; opacity: .95; text-shadow: 0 0 10px rgba(140,170,255,0.5); }
 #currencies .gold { color: #ffd77a; }
 #currencies .platinum { color: #d8f4ff; }
 #currencies .adam { color: #ff9a7a; }
@@ -39,14 +39,58 @@ html, body {
 #taken {
   position: fixed;
   left: 12px;
-  bottom: 42px;
-  display: grid;
-  gap: 8px;
-  z-index: 10;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10001;
+  max-height: 50vh;
+  overflow: hidden;
 }
-.taken-item { display: grid; grid-template-columns: 20px auto; align-items: center; gap: 8px; }
-.taken-item .ico { width: 20px; height: 20px; opacity: .95; filter: drop-shadow(0 0 6px rgba(140,170,255,0.25)); }
-.taken-item .txt { font-size: 12px; opacity: .85; color: #e8f0ff; text-shadow: 0 0 6px rgba(120,160,255,0.3); }
+
+.taken-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(20, 30, 60, 0.85);
+  border: 1px solid rgba(140, 170, 255, 0.25);
+  border-radius: 6px;
+  color: #e8f0ff;
+  font-size: 12px;
+  min-width: 140px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.taken-item .ico {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.95;
+  filter: drop-shadow(0 0 6px rgba(140,170,255,0.25));
+}
+
+.taken-item .txt {
+  font-weight: 500;
+  opacity: 0.95;
+  text-shadow: 0 0 6px rgba(120,160,255,0.3);
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
 
 #hint {
   opacity: 0.7;
@@ -251,10 +295,16 @@ html, body {
 
 #frameCounter {
   position: fixed;
-  top: 8px; right: 62px;
-  font-size: 11px;
-  color: rgba(215,230,255,0.8);
-  text-shadow: 0 0 6px rgba(140,170,255,0.35);
+  bottom: 8px; 
+  right: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  color: rgba(215,230,255,0.9);
+  text-shadow: 0 0 8px rgba(140,170,255,0.4);
+  background: rgba(10, 15, 30, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(140,170,255,0.2);
   z-index: 10000;
 }
 

@@ -32,7 +32,7 @@ const ASTEROIDS = {
   baseSpeed: 8,
 };
 
-const BULLET = { speed: 70, life: 1.1, r: 0.4 };
+const BULLET = { speed: 70, life: 1.1, r: 0.2 }; // Reduced radius by 50%
 
 const ENEMY = {
   radius: 1.2,
@@ -56,6 +56,7 @@ const clampMag = (vx, vy, max) => {
   }
   return [vx, vy];
 };
+function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 
 // Basic 2D wrapping in X/Y plane
 function wrap(obj) {
@@ -107,21 +108,97 @@ scene.fog = new THREE.FogExp2(0x02040a, 0.004);
 renderer.setClearColor(0x070a14, 1);
 
 // Starfield background
+let currentStars = null;
+let warpEffect = { active: false, progress: 0, direction: { x: 0, y: 1 } };
+
 function makeStars() {
+  // Remove existing stars
+  if (currentStars) {
+    scene.remove(currentStars);
+  }
+  
   const g = new THREE.BufferGeometry();
   const count = 1200;
   const positions = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  
   for (let i = 0; i < count; i++) {
-    positions[i * 3 + 0] = rand(-WORLD.width, WORLD.width);
-    positions[i * 3 + 1] = rand(-WORLD.height, WORLD.height);
-    positions[i * 3 + 2] = rand(-20, -2);
+    positions[i * 3 + 0] = rand(-WORLD.width * 1.5, WORLD.width * 1.5);
+    positions[i * 3 + 1] = rand(-WORLD.height * 1.5, WORLD.height * 1.5);
+    positions[i * 3 + 2] = rand(-50, -5); // Further back to ensure visibility
+    sizes[i] = rand(0.5, 1.5);
   }
+  
   g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const m = new THREE.PointsMaterial({ size: 0.4, color: 0x88aaff, transparent: true, opacity: 0.7 });
-  const stars = new THREE.Points(g, m);
-  stars.userData.kind = 'stars';
-  scene.add(stars);
+  g.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  
+  const m = new THREE.PointsMaterial({ 
+    size: 1.0, // Larger base size
+    color: 0x88aaff, 
+    transparent: true, 
+    opacity: 0.8, // More visible
+    sizeAttenuation: true, // Size based on distance
+    vertexColors: false
+  });
+  
+  currentStars = new THREE.Points(g, m);
+  currentStars.userData.kind = 'stars';
+  currentStars.userData.originalPositions = positions.slice();
+  currentStars.renderOrder = -1; // Render behind everything
+  scene.add(currentStars);
+  
+  console.log('[Asteroids] Stars generated:', count);
 }
+
+function startWarpEffect() {
+  if (!ship || !currentStars) return;
+  
+  warpEffect.active = true;
+  warpEffect.progress = 0;
+  warpEffect.direction.x = Math.cos(ship.rotation.z);
+  warpEffect.direction.y = Math.sin(ship.rotation.z);
+}
+
+function updateWarpEffect(dt) {
+  if (!warpEffect.active || !currentStars) return;
+  
+  warpEffect.progress += dt * 3.0; // Faster warp effect
+  
+  const positions = currentStars.geometry.attributes.position;
+  const originalPositions = currentStars.userData.originalPositions;
+  
+  for (let i = 0; i < positions.count; i++) {
+    const i3 = i * 3;
+    const origX = originalPositions[i3];
+    const origY = originalPositions[i3 + 1];
+    const origZ = originalPositions[i3 + 2];
+    
+    if (warpEffect.progress < 1.0) {
+      // Stretch stars in ship direction with more dramatic effect
+      const stretchFactor = warpEffect.progress * 25; // More dramatic stretch
+      const newX = origX + warpEffect.direction.x * stretchFactor;
+      const newY = origY + warpEffect.direction.y * stretchFactor;
+      
+      positions.setXYZ(i, newX, newY, origZ);
+    }
+  }
+  
+  positions.needsUpdate = true;
+  
+  // Add visual feedback
+  if (warpEffect.progress < 1.0) {
+    // Make stars brighter during warp
+    currentStars.material.opacity = 0.8 + (warpEffect.progress * 0.4);
+  }
+  
+  if (warpEffect.progress >= 1.0) {
+    warpEffect.active = false;
+    console.log('[Asteroids] Warp effect complete');
+    // Generate new starfield after warp
+    setTimeout(() => makeStars(), 100);
+  }
+}
+
 makeStars();
 
 // Postprocessing bloom for glow
@@ -173,6 +250,13 @@ function onResize() {
   outlinePass.setSize(window.innerWidth, window.innerHeight);
 }
 window.addEventListener('resize', onResize);
+
+// Zoom controls (Q = zoom in, A = zoom out)
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'q') { camera.zoom = Math.min(1.8, camera.zoom + 0.1); camera.updateProjectionMatrix(); }
+  if (k === 'a') { camera.zoom = Math.max(0.6, camera.zoom - 0.1); camera.updateProjectionMatrix(); }
+});
 
 // Materials
 const glowMat = new THREE.MeshStandardMaterial({ color: 0xa5c8ff, emissive: 0x335dff, emissiveIntensity: 1.7, roughness: 0.25, metalness: 0.0 });
@@ -445,11 +529,14 @@ function createTrail() {
   return line;
 }
 
-// Bullet
+// Bullet - now thin glowing lines
 function createBullet(x, y, dir, addVx = 0, addVy = 0) {
-  const g = new THREE.SphereGeometry(BULLET.r, 8, 8);
+  // Create a thin cylinder instead of sphere for line-like appearance
+  const g = new THREE.CylinderGeometry(BULLET.r * 0.3, BULLET.r * 0.3, 1.2, 6);
+  g.rotateZ(Math.PI / 2); // Rotate to point along X axis
   const bullet = new THREE.Mesh(g, bulletMat);
   bullet.position.set(x, y, 0);
+  bullet.rotation.z = dir; // Align with direction of travel
   const vx = Math.cos(dir) * BULLET.speed + addVx;
   const vy = Math.sin(dir) * BULLET.speed + addVy;
   bullet.userData = { kind: 'bullet', vx, vy, life: BULLET.life, radius: BULLET.r };
@@ -512,7 +599,18 @@ function createHunter(x, y) {
   g.rotateZ(Math.PI);
   const mesh = new THREE.Mesh(g, enemyMat.clone());
   mesh.position.set(x, y, 0);
-  mesh.userData = { kind: 'enemy', vx: 0, vy: 0, cool: rand(0.2, ENEMY.fireRate), radius: ENEMY.radius };
+  // Calculate boss number based on wave (wave 3 = boss 1, wave 6 = boss 2, etc.)
+  const bossNumber = Math.floor(wave / 3);
+  // Each boss is 20% faster than the previous one
+  const speedMultiplier = 1 + (bossNumber - 1) * 0.2;
+  mesh.userData = { 
+    kind: 'enemy', 
+    vx: 0, 
+    vy: 0, 
+    radius: ENEMY.radius,
+    maxSpeed: ENEMY.maxSpeed * speedMultiplier,
+    accel: ENEMY.accel * speedMultiplier
+  };
   scene.add(mesh);
   enemies.push(mesh);
   outlineTargets.push(mesh);
@@ -617,9 +715,16 @@ const endStatsEl = document.getElementById('endStats');
 const hangarEl = document.getElementById('hangar');
 const shopCardsEl = document.getElementById('shopCards');
 const leaveHangarBtn = document.getElementById('leaveHangar');
+const nextMissionBtn = document.getElementById('nextMission');
 const rerollBtn = document.getElementById('rerollShop');
 const banishBtn = document.getElementById('banishOne');
 const toggleVisBtn = document.getElementById('toggleVis');
+
+// Hangar currency display elements
+const hangarSalvageEl = document.getElementById('hangarSalvage');
+const hangarGoldEl = document.getElementById('hangarGold');
+const hangarPlatinumEl = document.getElementById('hangarPlatinum');
+const hangarAdamantiumEl = document.getElementById('hangarAdamantium');
 const rerollCostEl = document.getElementById('rerollCost');
 
 function setCanvasBlur(on){ const c = document.getElementById('game-canvas'); if(!c) return; if(on) c.classList.add('blurred'); else c.classList.remove('blurred'); }
@@ -630,7 +735,18 @@ const salvageEl = document.getElementById('salvageCount');
 const goldEl = document.getElementById('goldCount');
 const platEl = document.getElementById('platCount');
 const adamEl = document.getElementById('adamCount');
-function updateCurrencyHUD(){ if(salvageEl) salvageEl.textContent=salvage; if(goldEl) goldEl.textContent=gold; if(platEl) platEl.textContent=platinum; if(adamEl) adamEl.textContent=adamantium; }
+function updateCurrencyHUD(){ 
+  if(salvageEl) salvageEl.textContent=salvage; 
+  if(goldEl) goldEl.textContent=gold; 
+  if(platEl) platEl.textContent=platinum; 
+  if(adamEl) adamEl.textContent=adamantium; 
+  
+  // Update hangar currency display if visible
+  if(hangarSalvageEl) hangarSalvageEl.textContent=salvage;
+  if(hangarGoldEl) hangarGoldEl.textContent=gold;
+  if(hangarPlatinumEl) hangarPlatinumEl.textContent=platinum;
+  if(hangarAdamantiumEl) hangarAdamantiumEl.textContent=adamantium;
+}
 
 // Initialize SFX controls
 if (sfxVolEl && sfxMuteEl) {
@@ -644,6 +760,43 @@ if (sfxVolEl && sfxMuteEl) {
 }
 // Log toggle button always available
 if (toggleLogBtn) toggleLogBtn.onclick = () => { const s = document.getElementById('status'); if (s) s.dataset.show = s.dataset.show === '1' ? '0' : '1'; };
+
+// Reroll system variables
+let rerollCount = 0;
+let baseRerollCost = 15;
+
+// Reset reroll count each hangar visit
+function resetRerollSystem() {
+  rerollCount = 0;
+  updateRerollCost();
+}
+
+function updateRerollCost() {
+  const cost = Math.floor(baseRerollCost * Math.pow(1.15, rerollCount));
+  if (rerollCostEl) rerollCostEl.textContent = cost;
+  return cost;
+}
+
+function handleReroll() {
+  const cost = updateRerollCost();
+  if (salvage < cost) return; // Can't afford
+  
+  salvage -= cost;
+  updateCurrencyHUD();
+  rerollCount++;
+  
+  // Regenerate shop items with potential epic bonus
+  const hasEpicBonus = rerollCount >= 4;
+  generateShopItems(hasEpicBonus);
+  
+  updateRerollCost();
+  SFX.play('shop');
+}
+
+// Initialize button handlers
+if (leaveHangarBtn) leaveHangarBtn.onclick = () => closeHangar(false);
+if (nextMissionBtn) nextMissionBtn.onclick = () => closeHangar(false);
+if (rerollBtn) rerollBtn.onclick = handleReroll;
 
 // Upgrade history stack
 const ICONS = {
@@ -666,7 +819,18 @@ function pushTaken(opt) {
   const key = opt.key.replace(/\d+$/, '');
   const ico = ICONS[key] || ICONS.fire;
   item.innerHTML = `<div class="ico">${ico}</div><div class="txt">${opt.label}</div>`;
-  takenEl.appendChild(item);
+  
+  // Insert at the top of the stack (last upgrade first)
+  if (takenEl.firstChild) {
+    takenEl.insertBefore(item, takenEl.firstChild);
+  } else {
+    takenEl.appendChild(item);
+  }
+  
+  // Limit to showing last 8 upgrades
+  while (takenEl.children.length > 8) {
+    takenEl.removeChild(takenEl.lastChild);
+  }
 }
 
 // Legendary nova blast: clear nearby threats and score
@@ -688,31 +852,69 @@ function novaBlast() {
 }
 
 // Hangar Shop (every 3 waves)
+// Hangar Shop (every 3 waves)
 function openHangar(){
   pausedForUpgrade = true; mouse.enabled=false; setReticle(0,0,false); SFX.play('shop'); setCanvasBlur(true);
   if (!hangarEl) return; hangarEl.hidden=false; hangarEl.classList.add('show'); hangarEl.classList.remove('hide');
+  
+  // Update currency display in hangar
+  updateCurrencyHUD();
+  
+  // Reset reroll system for new hangar visit
+  resetRerollSystem();
+  
+  generateShopItems();
+}
+
+function generateShopItems(hasEpicBonus = false) {
   const pool = [
     { key:'overclock', label:'Overclock', desc:'+60% fire rate', rarity:'epic', cost:{salv:80,gold:2} , apply:()=>mods.fireRateMul*=1.6 },
     { key:'quantum', label:'Quantum Engine', desc:'+40% accel/speed', rarity:'epic', cost:{salv:80,plat:1} , apply:()=>mods.engineMul*=1.4 },
-    { key:'magnet', label:'Magnetic Collector', desc:'Bigger pickup radius', rarity:'uncommon', cost:{salv:40}, apply:()=>{mods.magnet=(mods.magnet||1)+0.6;} },
+    { key:'magnet', label:'Magnetic Collector', desc:'Bigger pickup radius', rarity:'uncommon', cost:{salv:40}, apply:()=>{mods.magnet=(mods.magnet||1.2)+0.8; mods.magnetLvl=(mods.magnetLvl||0)+1;} },
     { key:'shield', label:'Shield Charge', desc:'+1 shield', rarity:'common', cost:{salv:30}, apply:()=>mods.shields+=1 },
     { key:'drone', label:'Drone Buddy', desc:'+1 drone', rarity:'uncommon', cost:{salv:50,gold:1}, apply:()=>{ if(mods.drones<3){ addDrone(); mods.drones+=1; } } },
     { key:'ricochet', label:'Ricochet Rounds', desc:'Bullets bounce once', rarity:'uncommon', cost:{salv:60}, apply:()=>{ if(mods.ricochet<1) mods.ricochet=1; } },
   ];
-  // pick 4
-  const opts=[]; const bag=[...pool];
-  while(opts.length<4 && bag.length){ const i=Math.floor(Math.random()*bag.length); opts.push(bag.splice(i,1)[0]); }
+  // pick 4 with potential epic bonus
+  const opts = [];
+  const bag = [...pool];
+  
+  // If hasEpicBonus, increase chance for epic items
+  if (hasEpicBonus) {
+    const epicItems = bag.filter(item => item.rarity === 'epic');
+    // Add extra epic items to the bag to increase their chance
+    bag.push(...epicItems, ...epicItems); // Triple the epic weight
+  }
+  
+  while(opts.length < 4 && bag.length) {
+    const i = Math.floor(Math.random() * bag.length);
+    const item = bag.splice(i, 1)[0];
+    if (!opts.find(existing => existing.key === item.key)) {
+      opts.push(item);
+    }
+  }
   shopCardsEl.innerHTML='';
   for(const o of opts){
     const btn=document.createElement('button'); btn.className='card-btn'; btn.dataset.rarity=o.rarity||'common';
     const costStr = [o.cost?.salv?`⛭ ${o.cost.salv}`:'', o.cost?.gold?`◆ ${o.cost.gold}`:'', o.cost?.plat?`◈ ${o.cost.plat}`:'', o.cost?.adam?`⬢ ${o.cost.adam}`:''].filter(Boolean).join(' • ');
-    btn.innerHTML=`<div class="card-title">${o.label}</div><div class="card-desc">${o.desc}</div>${costStr?`<div class=\"card-cost\">${costStr}</div>`:''}`;
+    
+    // Get icon for the upgrade
+    const keyBase = o.key.replace(/\d+$/, '');
+    const iconSvg = iconFor(keyBase, 48);
+    
+    btn.innerHTML=`
+      <div class="card-icon" style="text-align:center; margin-bottom:8px;">${iconSvg}</div>
+      <div class="card-title" style="text-align:center; font-weight:bold; margin-bottom:6px;">${o.label}</div>
+      <div class="card-desc" style="text-align:center; font-size:12px; opacity:0.9; margin-bottom:8px;">${o.desc}</div>
+      ${costStr?`<div class="card-cost" style="text-align:center; font-size:11px; opacity:0.8;">${costStr}</div>`:''}
+    `;
+    
     const canAfford = (salvage>=(o.cost?.salv||0)) && (gold>=(o.cost?.gold||0)) && (platinum>=(o.cost?.plat||0)) && (adamantium>=(o.cost?.adam||0));
     if(!canAfford) btn.style.filter='grayscale(0.6) brightness(0.8)';
-    btn.onclick=()=>{ if(!canAfford) return; salvage -= (o.cost?.salv||0); gold-=(o.cost?.gold||0); platinum-=(o.cost?.plat||0); adamantium-=(o.cost?.adam||0); updateCurrencyHUD(); o.apply(); closeHangar(true); };
+    btn.onclick=()=>{ if(!canAfford) return; salvage -= (o.cost?.salv||0); gold-=(o.cost?.gold||0); platinum-=(o.cost?.plat||0); adamantium-=(o.cost?.adam||0); updateCurrencyHUD(); o.apply(); pushTaken(o); closeHangar(true); };
     shopCardsEl.appendChild(btn);
   }
-  attachCard3DInteractions(shopCardsEl);
+  // attachCard3DInteractions(shopCardsEl); // Function not defined - commented out to prevent crash
   // keyboard quick-pick 1-4
   const onKey=(e)=>{const items=[...shopCardsEl.querySelectorAll('.card-btn')]; if(e.key==='1'&&items[0]) items[0].click(); if(e.key==='2'&&items[1]) items[1].click(); if(e.key==='3'&&items[2]) items[2].click(); if(e.key==='4'&&items[3]) items[3].click();};
   window.addEventListener('keydown', onKey, { once:true });
@@ -721,7 +923,12 @@ function openHangar(){
 function closeHangar(purchased){
   if(!hangarEl) return; hangarEl.classList.remove('show'); hangarEl.classList.add('hide'); setTimeout(()=>hangarEl.hidden=true,350);
   setCanvasBlur(false);
-  pausedForUpgrade=false; mouse.enabled=true; wave++; spawnWave();
+  pausedForUpgrade=false; mouse.enabled=true; 
+  
+  // Set 3-second invulnerability when exiting hangar
+  invuln = 3.0;
+  
+  wave++; spawnWave();
 }
 
 function resetGame() {
@@ -733,6 +940,10 @@ function resetGame() {
   for (const eb of eBullets) scene.remove(eb); eBullets = [];
   for (const p of pickups) scene.remove(p); pickups = [];
   for (const en of enemies) scene.remove(en); enemies = [];
+  // hide overlays
+  if (endOverlay) { endOverlay.classList.remove('show'); endOverlay.classList.add('hide'); endOverlay.hidden = true; }
+  if (hangarEl) { hangarEl.classList.remove('show'); hangarEl.classList.add('hide'); hangarEl.hidden = true; }
+  setCanvasBlur(false);
   score = 0;
   wave = 1;
   gameOver = false;
@@ -745,6 +956,27 @@ function resetGame() {
     for (const d of drones) if (d.mesh) scene.remove(d.mesh);
     drones = [];
   }
+  
+  // Reset all upgrades and mods to default values (but keep currency)
+  mods.fireRateMul = 1.0;
+  mods.engineMul = 1.0;
+  mods.spread = false;
+  mods.pierce = false;
+  mods.shields = 0;
+  mods.ricochet = 0;
+  mods.drones = 0;
+  mods.magnet = undefined;
+  mods.magnetLvl = undefined;
+  
+  // Clear upgrade tracking display
+  if (takenEl) {
+    takenEl.innerHTML = '';
+  }
+  
+  // Update score and wave display
+  scoreEl.textContent = `Score: ${score}`;
+  waveEl.textContent = `Wave: ${wave}`;
+  
   ship.rotation.z = Math.PI / 2; // pointing up (geometry aligned to +X)
   invuln = 2.0; // brief safety window
   spawnWave();
@@ -754,8 +986,26 @@ function resetGame() {
 function spawnWave() {
   const count = 3 + wave;
   for (let i = 0; i < count; i++) {
-    const x = randSign() * rand(WORLD.width * 0.25, WORLD.width * 0.45);
-    const y = randSign() * rand(WORLD.height * 0.25, WORLD.height * 0.45);
+    // Spawn asteroids off-screen
+    // World visible area is ±45 width, ±30 height
+    // Add buffer to ensure they start completely outside
+    const buffer = 10;
+    const minX = WORLD.width / 2 + buffer;  // 55 units from center
+    const minY = WORLD.height / 2 + buffer; // 40 units from center
+    
+    // Randomly choose whether to spawn on X or Y boundary
+    let x, y;
+    if (Math.random() < 0.5) {
+      // Spawn on left/right edge
+      x = randSign() * rand(minX, minX + 20);
+      y = randSign() * rand(0, minY);
+    } else {
+      // Spawn on top/bottom edge
+      x = randSign() * rand(0, minX);
+      y = randSign() * rand(minY, minY + 20);
+    }
+    
+    // Point toward center with some variation
     const angle = Math.atan2(-y, -x) + rand(-0.6, 0.6);
     const speed = ASTEROIDS.baseSpeed * rand(0.6, 1.2) + wave * 0.3;
     const vx = Math.cos(angle) * speed;
@@ -830,7 +1080,7 @@ function tick() {
   let dt = now - last; last = now;
   dt = Math.min(dt, 0.033); // clamp
 
-  if (!gameOver && !pausedForUpgrade) update(dt);
+  if (started && !gameOver && !pausedForUpgrade) update(dt);
 
   if (shakeTime > 0) {
     shakeTime -= dt;
@@ -851,6 +1101,9 @@ function tick() {
 requestAnimationFrame(tick);
 
 function update(dt) {
+  // Update warp effect
+  updateWarpEffect(dt);
+  
   // tick invulnerability timer
   invuln = Math.max(0, invuln - dt);
   // Ship controls
@@ -907,6 +1160,7 @@ function update(dt) {
   const firing = mouse.lmb || fire;
   if (firing && s.fireCooldown <= 0) {
     shoot();
+    triggerDroneShooting(); // Trigger drone shooting when player shoots
     s.fireCooldown = PLAYER.fireRate / mods.fireRateMul;
     addShake(0.15, 0.06);
     // muzzle flash
@@ -946,28 +1200,26 @@ function update(dt) {
     wrap(a);
   }
 
-  // Update enemies
+  // Update enemies - bosses now chase player without shooting
   for (const e of enemies) {
     const dx = ship.position.x - e.position.x;
     const dy = ship.position.y - e.position.y;
     const dist = Math.hypot(dx, dy) + 1e-3;
     const dirx = dx / dist, diry = dy / dist;
-    const toward = dist > ENEMY.preferredDist ? 1 : -1;
-    e.userData.vx += (dirx * toward + -diry * 0.35) * ENEMY.accel * dt;
-    e.userData.vy += (diry * toward + dirx * 0.35) * ENEMY.accel * dt;
-    [e.userData.vx, e.userData.vy] = clampMag(e.userData.vx, e.userData.vy, ENEMY.maxSpeed);
+    // Always chase the player (no preferred distance)
+    e.userData.vx += dirx * e.userData.accel * dt;
+    e.userData.vy += diry * e.userData.accel * dt;
+    [e.userData.vx, e.userData.vy] = clampMag(e.userData.vx, e.userData.vy, e.userData.maxSpeed);
     e.position.x += e.userData.vx * dt; e.position.y += e.userData.vy * dt; wrap(e);
     e.rotation.z = Math.atan2(dy, dx);
-    e.userData.cool -= dt;
-    if (e.userData.cool <= 0 && dist < 45) { e.userData.cool = ENEMY.fireRate; eShoot(e.position.x + Math.cos(e.rotation.z) * 1.2, e.position.y + Math.sin(e.rotation.z) * 1.2, e.rotation.z); SFX.play('enemy_shoot'); }
+    // Bosses no longer shoot - removed shooting logic
   }
 
-  // Update enemy bullets
+  // Enemy bullets removed - bosses no longer shoot
+  // Clean up any remaining enemy bullets
   for (let i = eBullets.length - 1; i >= 0; i--) {
-    const b = eBullets[i];
-    b.userData.life -= dt;
-    if (b.userData.life <= 0) { scene.remove(b); eBullets.splice(i, 1); continue; }
-    b.position.x += b.userData.vx * dt; b.position.y += b.userData.vy * dt; wrap(b);
+    scene.remove(eBullets[i]);
+    eBullets.splice(i, 1);
   }
   // Update floating pickups
   updatePickups(dt);
@@ -1052,23 +1304,28 @@ function update(dt) {
         break;
       }
     }
-    // enemy bullets vs ship
-    for (let i = eBullets.length - 1; i >= 0; i--) {
-      const b = eBullets[i];
-      if (circleHit(ship.position.x, ship.position.y, ship.userData.radius, b.position.x, b.position.y, b.userData.radius)) {
-        if (mods.shields > 0) {
-          mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield');
-          scene.remove(b); eBullets.splice(i, 1); addShake(0.5, 0.12, ship.position.x, ship.position.y);
-        } else { die('Enemy bullet'); }
-        break;
-      }
-    }
+    // Enemy bullets removed - bosses no longer shoot
   }
 
   // Next wave
   if (asteroids.length === 0) {
-    const nextWave = wave + 1;
-    if (nextWave % 3 === 0) openHangar(); else offerUpgrades();
+    // Magnet pulse: after 3+ magnet upgrades, auto-collect remaining pickups on wave end
+    if ((mods.magnetLvl||0) >= 3 && pickups.length) {
+      for (let i = pickups.length - 1; i >= 0; i--) {
+        const p = pickups[i];
+        collectPickup(p);
+        scene.remove(p);
+        pickups.splice(i, 1);
+      }
+    }
+    // Start warp effect before showing upgrade/hangar
+    startWarpEffect();
+    
+    // Delay the upgrade/hangar screen to allow warp effect to play
+    setTimeout(() => {
+      const nextWave = wave + 1;
+      if (nextWave % 3 === 0) openHangar(); else offerUpgrades();
+    }, 600);
   }
 
   updateShieldVisual();
@@ -1086,6 +1343,8 @@ function die(reason = 'Destroyed') {
   gameoverEl.hidden = true;
   if (endOverlay) {
     if (endStatsEl) endStatsEl.textContent = `Score ${score} • Salvage ${salvage} • Gold ${gold} • Plat ${platinum} • Adam ${adamantium}`;
+    const endDeathEl = document.getElementById('endDeathReason');
+    if (endDeathEl) endDeathEl.textContent = `Destroyed by: ${reason}`;
     endOverlay.hidden = false; endOverlay.classList.add('show'); endOverlay.classList.remove('hide');
   }
   if (window.__status) window.__status.set('Crashed — Game Over');
@@ -1097,6 +1356,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'r') {
     ship.visible = true;
     resetGame();
+    started = true; // restart immediately
   }
 });
 
@@ -1209,6 +1469,10 @@ function offerUpgrades() {
 function resumeNextWave() {
   choicesEl.hidden = true;
   pausedForUpgrade = false;
+  
+  // Set 3-second invulnerability when starting new wave
+  invuln = 3.0;
+  
   wave++;
   spawnWave();
   if (window.__status) window.__status.set(`Running — Wave ${wave}`);
@@ -1265,7 +1529,16 @@ function addDrone() {
   const geo = new THREE.SphereGeometry(0.5, 12, 12);
   const mat = new THREE.MeshStandardMaterial({ color: 0x92ffdd, emissive: 0x227755, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.1 });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.userData = { t: Math.random()*Math.PI*2, cd: 0 };
+  
+  // Initialize with random angle offset for multiple drones
+  const angleOffset = (drones.length * (Math.PI * 2)) / 3; // Spread 3 drones evenly
+  mesh.userData = { 
+    t: angleOffset, 
+    cd: 0,
+    shotsSincePlayerShot: 0,
+    shouldShootNext: false
+  };
+  
   scene.add(mesh);
   drones.push({ mesh });
   outlineTargets.push(mesh);
@@ -1274,26 +1547,53 @@ function addDrone() {
 function updateDrones(dt) {
   if (!drones.length) return;
   const r = 4.2;
-  for (const d of drones) {
-    d.mesh.userData.t += dt * 3.5;
+  
+  for (let i = 0; i < drones.length; i++) {
+    const d = drones[i];
+    if (!d.mesh) continue;
+    
+    // Orbit around ship at different speeds and radii for variation
+    const speedMultiplier = 1 + (i * 0.3); // Each drone orbits at slightly different speed
+    const radiusOffset = i * 0.8; // Each drone at slightly different distance
+    d.mesh.userData.t += dt * 2.5 * speedMultiplier;
+    
     const t = d.mesh.userData.t;
-    d.mesh.position.set(ship.position.x + Math.cos(t)*r, ship.position.y + Math.sin(t)*r, 0);
+    const orbitRadius = r + radiusOffset;
+    d.mesh.position.set(
+      ship.position.x + Math.cos(t) * orbitRadius, 
+      ship.position.y + Math.sin(t) * orbitRadius, 
+      0
+    );
+    
+    // Cooldown management
     d.mesh.userData.cd -= dt;
-    if (d.mesh.userData.cd <= 0) {
+    
+    // Check if drone should shoot (when flagged to shoot next)
+    if (d.mesh.userData.shouldShootNext && d.mesh.userData.cd <= 0) {
       const target = acquireTarget();
       if (target) {
-        d.mesh.userData.cd = 0.5;
+        d.mesh.userData.cd = 0.5; // Drone fire rate
         const ang = Math.atan2(target.position.y - d.mesh.position.y, target.position.x - d.mesh.position.x);
-        const b = createBullet(d.mesh.position.x, d.mesh.position.y, ang, ship.userData.vx*0.2, ship.userData.vy*0.2);
+        const b = createBullet(d.mesh.position.x, d.mesh.position.y, ang, ship.userData.vx * 0.2, ship.userData.vy * 0.2);
         b.userData.pierce = 0;
         bullets.push(b);
         particles.emitBurst(d.mesh.position.x, d.mesh.position.y, { count: 4, speed: [8,14], life: [0.08,0.16], size:[0.15,0.3], color:0x9fffe6 });
         SFX.play('shoot');
+        d.mesh.userData.shouldShootNext = false;
       } else {
         d.mesh.userData.cd = 0.25;
       }
     }
   }
+}
+
+// Call this when player shoots to trigger drone shooting
+function triggerDroneShooting() {
+  drones.forEach(d => {
+    if (d.mesh && Math.random() < 0.33) { // 1/3 chance
+      d.mesh.userData.shouldShootNext = true;
+    }
+  });
 }
 
 function acquireTarget() {
@@ -1324,7 +1624,8 @@ function spawnDrops(a){
 
 function addPickup(kind, amount, x, y){
   const color = kind==='gold'?0xffd77a: kind==='platinum'?0xd8f4ff: kind==='adam'?0xff9a7a:0xbde2ff;
-  const mat = new THREE.SpriteMaterial({ color, transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending });
+  // Reduced opacity and normal blending to make pickups glow less
+  const mat = new THREE.SpriteMaterial({ color, transparent:true, opacity:0.65, depthWrite:false, blending:THREE.NormalBlending });
   for(let i=0;i<amount;i++){
     const s = new THREE.Sprite(mat.clone());
     s.scale.set(0.8,0.8,1);
@@ -1335,14 +1636,19 @@ function addPickup(kind, amount, x, y){
 }
 
 function updatePickups(dt){
-  const attractR = 6 * (mods.magnet || 1);
+  // Stronger attraction radius and pull strength
+  const attractR = 10 * (mods.magnet || 1.5);
   for(let i=pickups.length-1;i>=0;i--){
     const p = pickups[i];
     p.userData.age += dt;
     p.position.x += p.userData.vx * dt; p.position.y += p.userData.vy * dt; p.userData.vx*=0.98; p.userData.vy*=0.98; wrap(p);
     if (p.userData.age > p.userData.collectible){
       const dx = ship.position.x - p.position.x; const dy = ship.position.y - p.position.y; const d = Math.hypot(dx,dy);
-      if (d < attractR){ p.userData.vx += (dx/d)*20*dt; p.userData.vy += (dy/d)*20*dt; }
+      if (d < attractR){
+        const ax = (dx/d) * 60 * dt;
+        const ay = (dy/d) * 60 * dt;
+        p.userData.vx += ax; p.userData.vy += ay;
+      }
       if (d < 0.8){
         collectPickup(p); scene.remove(p); pickups.splice(i,1); continue;
       }

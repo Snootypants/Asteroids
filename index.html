@@ -90,22 +90,45 @@
       <div class="overlay-center">
         <h1>Run Over</h1>
         <p id="endStats"></p>
+        <p id="endDeathReason" style="color: #ff6b6b; margin: 10px 0; font-size: 1.1em;"></p>
         <p>Press R to restart</p>
+      </div>
+    </div>
+
+    <!-- Start screen overlay -->
+    <div id="startOverlay" class="overlay show">
+      <img src="assets/start_screen.png" alt="Start Screen" class="overlay-img"/>
+      <div class="overlay-center">
+        <h1>Asteroids Roguelite</h1>
+        <p>Click to start • WASD/Mouse • Space to shoot • R to restart</p>
       </div>
     </div>
 
     <!-- Hangar Shop overlay -->
     <div id="hangar" class="overlay" hidden>
+      <img src="assets/Hanger.png" alt="Hangar Background" class="overlay-img"/>
       <div class="overlay-center">
         <h1>HANGAR</h1>
         <p>Spend salvage and ores to upgrade</p>
       </div>
-      <div id="shopCards" class="choices choices-3d" aria-live="polite"></div>
+      
+      <!-- Moved cards higher up -->
+      <div id="shopCards" class="choices choices-3d" aria-live="polite" style="position:absolute; top:30%; left:50%; transform:translateX(-50%); z-index:10003;"></div>
       <div id="choicesMouseLayer" aria-hidden="true"></div>
+      
+      <!-- Currency Display moved below cards -->
+      <div id="hangarCurrency" style="position:absolute; top:65%; left:50%; transform:translateX(-50%); z-index:10003; display:flex; gap:24px; font-size:20px; font-weight:bold; text-shadow:0 0 12px rgba(140,170,255,0.6);">
+        <span class="c salvage" title="Salvage" style="color:#bde2ff;">⛭ <span id="hangarSalvage">0</span></span>
+        <span class="c gold" title="Gold" style="color:#ffd77a;">◆ <span id="hangarGold">0</span></span>
+        <span class="c platinum" title="Platinum" style="color:#d8f4ff;">◈ <span id="hangarPlatinum">0</span></span>
+        <span class="c adam" title="Adamantium" style="color:#ff9a7a;">⬢ <span id="hangarAdamantium">0</span></span>
+      </div>
+      
       <div class="shop-row" style="position:absolute; bottom:40px; left:50%; transform:translateX(-50%); display:flex; gap:10px;">
         <button id="rerollShop">Reroll (🟦 <span id="rerollCost">15</span>)</button>
         <button id="banishOne">Banish 1 (free)</button>
         <button id="toggleVis">High-Vis Bullets</button>
+        <button id="nextMission" style="background: linear-gradient(45deg, #4a90e2, #357abd); border: 2px solid #5ba3ff; font-weight: bold; font-size: 16px; padding: 10px 20px;">Next Mission</button>
         <button id="leaveHangar">Launch</button>
       </div>
       <p id="shopInfo" class="sub" style="position:absolute; bottom:14px; left:50%; transform:translateX(-50%);">Epics unlock after Wave 5 or when you own prerequisites.</p>
@@ -119,14 +142,6 @@
         if (window.__gameBoot !== 'running') {
           console.warn('[Asteroids] Module did not boot. Check DevTools > Console for import errors.');
           const msg = document.createElement('div');
-    <!-- Start screen overlay -->
-    <div id="startOverlay" class="overlay show">
-      <img src="assets/start_screen.png" alt="Start Screen" class="overlay-img"/>
-      <div class="overlay-center">
-        <h1>Asteroids Roguelite</h1>
-        <p>Click to start • WASD/Mouse • Space to shoot • R to restart</p>
-      </div>
-    </div>
           msg.style.position = 'fixed';
           msg.style.bottom = '10px';
           msg.style.right = '10px';
