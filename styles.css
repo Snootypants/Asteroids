@@ -30,8 +30,26 @@ html, body {
 }
 
 /* Currency HUD */
-#currencies { position: fixed; top: 10px; right: 90px; display: grid; grid-auto-flow: column; gap: 16px; z-index: 10; }
-#currencies .c { font-size: 16px; font-weight: bold; opacity: .95; text-shadow: 0 0 10px rgba(140,170,255,0.5); }
+#currencies { 
+  position: fixed; 
+  top: 10px; 
+  right: 20px; 
+  display: grid; 
+  grid-auto-flow: column; 
+  gap: 24px; 
+  z-index: 10; 
+}
+#currencies .c { 
+  font-size: 32px; /* Doubled from 16px to 32px (100% bigger) */
+  font-weight: bold; 
+  opacity: .95; 
+  text-shadow: 0 0 15px rgba(140,170,255,0.6); /* Enhanced shadow */
+  padding: 8px 12px; /* Added padding for better spacing */
+  background: rgba(8,10,20,0.4); /* Subtle background */
+  border-radius: 8px; /* Rounded corners */
+  border: 1px solid rgba(120,150,255,0.2); /* Subtle border */
+  backdrop-filter: blur(4px); /* Glass effect */
+}
 #currencies .gold { color: #ffd77a; }
 #currencies .platinum { color: #d8f4ff; }
 #currencies .adam { color: #ff9a7a; }
@@ -164,7 +182,8 @@ html, body {
 
 #toggleLog {
   position: fixed;
-  top: 8px; right: 8px;
+  top: 8px; 
+  right: 8px;
   z-index: 10001;
   background: rgba(12,16,28,0.7);
   color: #cfe0ff;
@@ -173,6 +192,7 @@ html, body {
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
+  margin-top: 80px; /* Push down to avoid currency overlap */
 }
 
 #copyright {

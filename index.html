@@ -132,23 +132,23 @@
       <div id="shopCards" class="choices choices-3d" aria-live="polite" style="position:absolute; top:35%; left:50%; transform:translateX(-50%); z-index:10003;"></div>
       <div id="choicesMouseLayer" aria-hidden="true"></div>
       
-      <!-- Currency Display moved much farther down with bigger font -->
-      <div id="hangarCurrency" style="position:absolute; top:75%; left:50%; transform:translateX(-50%); z-index:10003; display:flex; gap:32px; font-size:28px; font-weight:bold; text-shadow:0 0 15px rgba(140,170,255,0.7);">
-        <span class="c salvage" title="Salvage" style="color:#bde2ff;">⛭ <span id="hangarSalvage">0</span></span>
-        <span class="c gold" title="Gold" style="color:#ffd77a;">◆ <span id="hangarGold">0</span></span>
-        <span class="c platinum" title="Platinum" style="color:#d8f4ff;">◈ <span id="hangarPlatinum">0</span></span>
-        <span class="c adam" title="Adamantium" style="color:#ff9a7a;">⬢ <span id="hangarAdamantium">0</span></span>
+      <!-- Currency Display moved much farther down with enhanced styling -->
+      <div id="hangarCurrency" style="position:absolute; top:75%; left:50%; transform:translateX(-50%); z-index:10003; display:flex; gap:32px; font-size:32px; font-weight:bold; text-shadow:0 0 15px rgba(140,170,255,0.7);">
+        <span class="c salvage" title="Salvage" style="color:#bde2ff; padding: 8px 12px; background: rgba(8,10,20,0.5); border-radius: 8px; border: 1px solid rgba(120,150,255,0.3);">⛭ <span id="hangarSalvage">0</span></span>
+        <span class="c gold" title="Gold" style="color:#ffd77a; padding: 8px 12px; background: rgba(8,10,20,0.5); border-radius: 8px; border: 1px solid rgba(255,215,122,0.3);">◆ <span id="hangarGold">0</span></span>
+        <span class="c platinum" title="Platinum" style="color:#d8f4ff; padding: 8px 12px; background: rgba(8,10,20,0.5); border-radius: 8px; border: 1px solid rgba(216,244,255,0.3);">◈ <span id="hangarPlatinum">0</span></span>
+        <span class="c adam" title="Adamantium" style="color:#ff9a7a; padding: 8px 12px; background: rgba(8,10,20,0.5); border-radius: 8px; border: 1px solid rgba(255,154,122,0.3);">⬢ <span id="hangarAdamantium">0</span></span>
       </div>
       
-      <!-- Buttons moved up to center between bottom of screen and bottom of cards -->
-      <div class="shop-row" style="position:absolute; bottom:20%; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:10004;">
-        <button id="rerollShop">Reroll (🟦 <span id="rerollCost">15</span>)</button>
-        <button id="banishOne">Banish 1 (free)</button>
-        <button id="toggleVis">High-Vis Bullets</button>
-        <button id="nextMission" style="background: linear-gradient(45deg, #4a90e2, #357abd); border: 2px solid #5ba3ff; font-weight: bold; font-size: 16px; padding: 10px 20px;">Next Mission</button>
-        <button id="leaveHangar">Launch</button>
+      <!-- Buttons positioned halfway between currency and tip text -->
+      <div class="shop-row" style="position:absolute; bottom:15%; left:50%; transform:translateX(-50%); display:flex; gap:12px; z-index:10004; flex-wrap: wrap; justify-content: center; max-width: 90vw;">
+        <button id="rerollShop" style="padding: 8px 16px; border-radius: 6px; background: rgba(20,30,60,0.8); border: 1px solid rgba(120,150,255,0.4); color: #e8f0ff; font-size: 14px; cursor: pointer;">Reroll (🟦 <span id="rerollCost">15</span>)</button>
+        <button id="banishOne" style="padding: 8px 16px; border-radius: 6px; background: rgba(60,20,20,0.8); border: 1px solid rgba(255,120,120,0.4); color: #ffe8e8; font-size: 14px; cursor: pointer;">Banish 1 (free)</button>
+        <button id="toggleVis" style="padding: 8px 16px; border-radius: 6px; background: rgba(20,40,60,0.8); border: 1px solid rgba(120,180,255,0.4); color: #e8f4ff; font-size: 14px; cursor: pointer;">High-Vis Bullets</button>
+        <button id="nextMission" style="background: linear-gradient(45deg, #4a90e2, #357abd); border: 2px solid #5ba3ff; font-weight: bold; font-size: 16px; padding: 12px 24px; border-radius: 8px; color: white; cursor: pointer; box-shadow: 0 4px 12px rgba(74,144,226,0.3);">Next Mission</button>
+        <button id="leaveHangar" style="padding: 8px 16px; border-radius: 6px; background: rgba(40,60,40,0.8); border: 1px solid rgba(120,255,120,0.4); color: #e8ffe8; font-size: 14px; cursor: pointer;">Launch</button>
       </div>
-      <p id="shopInfo" class="sub" style="position:absolute; bottom:8%; left:50%; transform:translateX(-50%);">Epics unlock after Wave 5 or when you own prerequisites.</p>
+      <p id="shopInfo" class="sub" style="position:absolute; bottom:6%; left:50%; transform:translateX(-50%);">Epics unlock after Wave 5 or when you own prerequisites.</p>
     </div>
     <div id="copyright">© 2025 Snootypants. All rights reserved.</div>
     <script type="module" src="src/main.js"></script>

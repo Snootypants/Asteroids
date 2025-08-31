@@ -508,13 +508,92 @@ const debris = new DebrisSystem(260);
 
 // Ship
 function createShip() {
-  const g = new THREE.ConeGeometry(1.0, 2.0, 3);
-  // Orient cone axis along +X so ship's "front" matches rotation math
-  g.rotateZ(-Math.PI / 2);
-  const mesh = new THREE.Mesh(g, glowMat.clone());
-  mesh.userData = { kind: 'ship', vx: 0, vy: 0, rot: 0, alive: true, fireCooldown: 0, radius: 1.0 };
+  // Load ship texture
+  const loader = new THREE.TextureLoader();
+  const shipTexture = loader.load('assets/ship/ship.png');
+  
+  // Create ship sprite
+  const shipMaterial = new THREE.SpriteMaterial({ 
+    map: shipTexture, 
+    transparent: true,
+    opacity: 1.0
+  });
+  
+  const mesh = new THREE.Sprite(shipMaterial);
+  mesh.scale.set(3.0, 3.0, 1.0); // Scale to appropriate size
+  mesh.userData = { kind: 'ship', vx: 0, vy: 0, rot: 0, alive: true, fireCooldown: 0, radius: 1.5 };
   scene.add(mesh);
   return mesh;
+}
+
+// Boost flame particles system
+function createBoostFlames() {
+  const flameGeometry = new THREE.PlaneGeometry(0.8, 1.5);
+  const flameMaterial = new THREE.MeshBasicMaterial({ 
+    color: 0x4488ff, 
+    transparent: true, 
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending
+  });
+  
+  const flame1 = new THREE.Mesh(flameGeometry, flameMaterial.clone());
+  const flame2 = new THREE.Mesh(flameGeometry, flameMaterial.clone());
+  
+  flame1.userData = { kind: 'boostFlame', baseOpacity: 0.8, flickerOffset: 0 };
+  flame2.userData = { kind: 'boostFlame', baseOpacity: 0.6, flickerOffset: Math.PI };
+  
+  flame1.visible = false;
+  flame2.visible = false;
+  
+  scene.add(flame1);
+  scene.add(flame2);
+  
+  return [flame1, flame2];
+}
+
+// Update boost flames position and effects
+function updateBoostFlames(flames, ship, thrusting, dt) {
+  if (!flames || flames.length === 0) return;
+  
+  const [flame1, flame2] = flames;
+  
+  if (thrusting) {
+    // Position flames behind ship
+    const flameDistance = -2.2;
+    const flameOffset = 0.3;
+    
+    flame1.position.set(
+      ship.position.x + Math.cos(ship.rotation.z + Math.PI) * flameDistance,
+      ship.position.y + Math.sin(ship.rotation.z + Math.PI) * flameDistance + flameOffset,
+      ship.position.z
+    );
+    
+    flame2.position.set(
+      ship.position.x + Math.cos(ship.rotation.z + Math.PI) * flameDistance,
+      ship.position.y + Math.sin(ship.rotation.z + Math.PI) * flameDistance - flameOffset,
+      ship.position.z
+    );
+    
+    // Rotate flames to match ship direction
+    flame1.rotation.z = ship.rotation.z;
+    flame2.rotation.z = ship.rotation.z;
+    
+    // Animate flame opacity for flickering effect
+    const time = performance.now() * 0.01;
+    flame1.material.opacity = flame1.userData.baseOpacity + Math.sin(time + flame1.userData.flickerOffset) * 0.3;
+    flame2.material.opacity = flame2.userData.baseOpacity + Math.sin(time * 1.3 + flame2.userData.flickerOffset) * 0.2;
+    
+    // Animate flame scale for pulsing effect
+    const scaleFlicker = 1.0 + Math.sin(time * 2) * 0.15;
+    flame1.scale.set(scaleFlicker, scaleFlicker * 1.2, 1);
+    flame2.scale.set(scaleFlicker * 0.8, scaleFlicker, 1);
+    
+    flame1.visible = true;
+    flame2.visible = true;
+  } else {
+    flame1.visible = false;
+    flame2.visible = false;
+  }
 }
 
 // Engine trail (simple line that updates)
@@ -683,6 +762,7 @@ window.addEventListener('keydown', (e) => {
 
 // State
 let ship = createShip();
+let boostFlames = createBoostFlames();
 const trail = createTrail();
 let bullets = [];
 let asteroids = [];
@@ -794,8 +874,8 @@ function handleReroll() {
 }
 
 // Initialize button handlers
-if (leaveHangarBtn) leaveHangarBtn.onclick = () => closeHangar(false);
-if (nextMissionBtn) nextMissionBtn.onclick = () => closeHangar(false);
+if (leaveHangarBtn) leaveHangarBtn.onclick = () => closeHangar(true); // Advance wave
+if (nextMissionBtn) nextMissionBtn.onclick = () => closeHangar(true); // Advance wave
 if (rerollBtn) rerollBtn.onclick = handleReroll;
 
 // Upgrade history stack
@@ -911,7 +991,21 @@ function generateShopItems(hasEpicBonus = false) {
     
     const canAfford = (salvage>=(o.cost?.salv||0)) && (gold>=(o.cost?.gold||0)) && (platinum>=(o.cost?.plat||0)) && (adamantium>=(o.cost?.adam||0));
     if(!canAfford) btn.style.filter='grayscale(0.6) brightness(0.8)';
-    btn.onclick=()=>{ if(!canAfford) return; salvage -= (o.cost?.salv||0); gold-=(o.cost?.gold||0); platinum-=(o.cost?.plat||0); adamantium-=(o.cost?.adam||0); updateCurrencyHUD(); o.apply(); pushTaken(o); closeHangar(true); };
+    btn.onclick=()=>{ 
+      if(!canAfford) return; 
+      salvage -= (o.cost?.salv||0); 
+      gold-=(o.cost?.gold||0); 
+      platinum-=(o.cost?.plat||0); 
+      adamantium-=(o.cost?.adam||0); 
+      updateCurrencyHUD(); 
+      o.apply(); 
+      pushTaken(o); 
+      SFX.play('upgrade');
+      // Remove the purchased item from the shop
+      btn.style.filter='grayscale(1.0) brightness(0.5)';
+      btn.style.pointerEvents='none';
+      btn.innerHTML += '<div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#4a90e2; font-weight:bold; font-size:16px;">PURCHASED</div>';
+    };
     shopCardsEl.appendChild(btn);
   }
   // attachCard3DInteractions(shopCardsEl); // Function not defined - commented out to prevent crash
@@ -920,15 +1014,23 @@ function generateShopItems(hasEpicBonus = false) {
   window.addEventListener('keydown', onKey, { once:true });
 }
 
-function closeHangar(purchased){
-  if(!hangarEl) return; hangarEl.classList.remove('show'); hangarEl.classList.add('hide'); setTimeout(()=>hangarEl.hidden=true,350);
+function closeHangar(shouldAdvanceWave = true){
+  if(!hangarEl) return; 
+  hangarEl.classList.remove('show'); 
+  hangarEl.classList.add('hide'); 
+  setTimeout(()=>hangarEl.hidden=true,350);
   setCanvasBlur(false);
-  pausedForUpgrade=false; mouse.enabled=true; 
+  pausedForUpgrade=false; 
+  mouse.enabled=true; 
   
   // Set 3-second invulnerability when exiting hangar
   invuln = 3.0;
   
-  wave++; spawnWave();
+  // Only advance wave if explicitly requested (via button click)
+  if (shouldAdvanceWave) {
+    wave++; 
+    spawnWave();
+  }
 }
 
 function resetGame() {
@@ -951,6 +1053,14 @@ function resetGame() {
   ship.userData.vx = 0;
   ship.userData.vy = 0;
   ship.position.set(0, 0, 0);
+  
+  // Recreate boost flames
+  if (boostFlames) {
+    for (const flame of boostFlames) {
+      if (flame) scene.remove(flame);
+    }
+  }
+  boostFlames = createBoostFlames();
   // remove drones
   if (typeof drones !== 'undefined') {
     for (const d of drones) if (d.mesh) scene.remove(d.mesh);
@@ -1137,6 +1247,9 @@ function update(dt) {
   } else {
     trail.visible = false;
   }
+  
+  // Update boost flames
+  updateBoostFlames(boostFlames, ship, thrusting, dt);
 
   [s.vx, s.vy] = clampMag(s.vx, s.vy, tunedMaxSpeed());
   s.vx *= PLAYER.friction; s.vy *= PLAYER.friction;
