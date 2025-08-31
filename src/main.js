@@ -399,7 +399,7 @@ function setReticle(x, y, show = true) { if (!reticleEl) return; reticleEl.style
 window.addEventListener('mousemove', (e) => { 
   mouseScreen.x = e.clientX; 
   mouseScreen.y = e.clientY; 
-  if (!pausedForUpgrade && !gameOver && !paused && started) {
+  if (!pausedForUpgrade && !gameOver && !paused) {
     setReticle(mouseScreen.x, mouseScreen.y, true); 
   }
 });
@@ -1281,7 +1281,7 @@ function update(dt) {
   // Ship controls
   const s = ship.userData;
   // Aim at current cursor position (world projection)
-  if (mouse.enabled && !pausedForUpgrade && !paused && started && !gameOver) {
+  if (mouse.enabled && !pausedForUpgrade && !paused && !gameOver) {
     const w = screenToWorld(mouseScreen.x, mouseScreen.y);
     const dx = w.x - ship.position.x;
     const dy = w.y - ship.position.y;
