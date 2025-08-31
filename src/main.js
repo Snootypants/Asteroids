@@ -392,20 +392,33 @@ const particles = new ParticleSystem(350);
 console.log('[Asteroids] particles ready');
 if (window.__status) window.__status.log('Particles ready');
 
-// Reticle and mouse aiming (absolute cursor) + UI hookups
+// Reticle and mouse aiming system
 const reticleEl = document.getElementById('reticle');
 let mouseScreen = { x: window.innerWidth/2, y: window.innerHeight/2 };
-function setReticle(x, y, show = true) { if (!reticleEl) return; reticleEl.style.left = `${x}px`; reticleEl.style.top = `${y}px`; reticleEl.hidden = !show; }
+
+function setReticle(x, y, show = true) { 
+  if (!reticleEl) return; 
+  reticleEl.style.left = `${x}px`; 
+  reticleEl.style.top = `${y}px`; 
+  reticleEl.hidden = !show; 
+}
+
+// Mouse tracking for ship rotation
 window.addEventListener('mousemove', (e) => { 
   mouseScreen.x = e.clientX; 
   mouseScreen.y = e.clientY; 
-  if (!pausedForUpgrade && !gameOver && !paused) {
+  // Only show reticle when mouse aiming is active
+  if (!pausedForUpgrade && !gameOver && !paused && mouse.enabled) {
     setReticle(mouseScreen.x, mouseScreen.y, true); 
+  } else {
+    setReticle(0, 0, false);
   }
 });
+
+// Convert screen coordinates to world coordinates
 function screenToWorld(sx, sy) {
   const ndcX = (sx / window.innerWidth) * 2 - 1;
-  const ndcY = - (sy / window.innerHeight) * 2 + 1;
+  const ndcY = -(sy / window.innerHeight) * 2 + 1;
   const wx = THREE.MathUtils.mapLinear(ndcX, -1, 1, camera.left, camera.right);
   const wy = THREE.MathUtils.mapLinear(ndcY, -1, 1, camera.bottom, camera.top);
   return new THREE.Vector3(wx, wy, 0);
@@ -597,7 +610,7 @@ function updateBoostFlames(flames, ship, thrusting, dt) {
     const flameDistance = 2.2; // Distance behind ship
     const flameOffset = 0.3;
     
-    // Ship sprite faces up by default, rotation.z is the ship's facing direction
+    // Ship mesh faces up by default, rotation.z is the ship's facing direction
     const shipDirection = ship.rotation.z + Math.PI/2; // Convert to movement direction
     
     // Place flames behind ship (opposite of movement direction)
@@ -803,11 +816,14 @@ function spawnBeacon(x, y, delay, onDone) {
   afterUpdates.add(update);
 }
 
+// Input system
+const keys = new Set();
+const mouse = { enabled: true, lmb: false, rmb: false };
+
 // Hook to run small update callbacks each frame (for beacons)
 const afterUpdates = new Set();
 
-// Input
-const keys = new Set();
+// Keyboard input handling
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (document.pointerLockElement === renderer.domElement) {
@@ -832,13 +848,24 @@ window.addEventListener('keydown', (e) => {
   keys.add(e.key.toLowerCase());
   if (e.key === ' ') e.preventDefault();
 });
+
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
-// Mouse buttons for fire/thrust
-const mouse = { enabled: true, lmb: false, rmb: false };
-window.addEventListener('mousedown', (e) => { if (pausedForUpgrade || gameOver) return; if (e.button===0) mouse.lmb=true; if (e.button===2) mouse.rmb=true; });
-window.addEventListener('mouseup', (e) => { if (e.button===0) mouse.lmb=false; if (e.button===2) mouse.rmb=false; });
-window.addEventListener('contextmenu', (e) => { if (!pausedForUpgrade && !gameOver) e.preventDefault(); });
+// Mouse input handling
+window.addEventListener('mousedown', (e) => { 
+  if (pausedForUpgrade || gameOver) return; 
+  if (e.button === 0) mouse.lmb = true; 
+  if (e.button === 2) mouse.rmb = true; 
+});
+
+window.addEventListener('mouseup', (e) => { 
+  if (e.button === 0) mouse.lmb = false; 
+  if (e.button === 2) mouse.rmb = false; 
+});
+
+window.addEventListener('contextmenu', (e) => { 
+  if (!pausedForUpgrade && !gameOver && mouse.enabled) e.preventDefault(); 
+});
 
 // State
 let ship = createShip();
@@ -1306,30 +1333,20 @@ function update(dt) {
   invuln = Math.max(0, invuln - dt);
   // Ship controls
   const s = ship.userData;
-  // Aim at current cursor position (world projection)
+  // Ship rotation - aim at current cursor position
   if (mouse.enabled && !pausedForUpgrade && !paused && !gameOver) {
     const w = screenToWorld(mouseScreen.x, mouseScreen.y);
     const dx = w.x - ship.position.x;
     const dy = w.y - ship.position.y;
     const distance = Math.hypot(dx, dy);
     
-    // Scale minimum distance with zoom - closer when zoomed in, further when zoomed out
-    const minDistance = 0.5 / camera.zoom;
+    // Scale minimum distance with zoom to prevent jittery rotation
+    const minDistance = 0.8 / camera.zoom;
     
-    // Only update rotation if mouse is not too close to ship (prevents jitter)
+    // Only update rotation if mouse is not too close to ship
     if (distance > minDistance) {
       const ang = Math.atan2(dy, dx);
-      
-      // For sprites, we need to adjust the rotation differently
-      // Sprites face up by default, so we point them towards the mouse
-      ship.rotation.z = ang - Math.PI/2; // This should make sprite top face the mouse
-      
-      // Debug info for mouse tracking and verify rotation is being set
-      console.log(`[Asteroids] Setting ship rotation to: ${ship.rotation.z} (${(ship.rotation.z * 180/Math.PI).toFixed(1)}°)`);
-      
-      if (window.__status) {
-        window.__status.set(`Mouse: screen(${mouseScreen.x.toFixed(0)}, ${mouseScreen.y.toFixed(0)}) world(${w.x.toFixed(1)}, ${w.y.toFixed(1)}) ship(${ship.position.x.toFixed(1)}, ${ship.position.y.toFixed(1)}) angle=${(ship.rotation.z * 180/Math.PI).toFixed(1)}° zoom=${camera.zoom.toFixed(1)}x dist=${distance.toFixed(1)}`);
-      }
+      ship.rotation.z = ang - Math.PI/2; // Adjust for mesh facing up by default
     }
   }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
@@ -1344,7 +1361,7 @@ function update(dt) {
 
   const thrusting = mouse.rmb || thrust;
   if (thrusting) {
-    // Ship sprite faces up, rotation.z is already the direction to move
+    // Ship mesh faces up, rotation.z is already the direction to move
     const shipDirection = ship.rotation.z + Math.PI/2; // Convert ship rotation to movement direction
     const ax = Math.cos(shipDirection) * tunedAccel() * dt;
     const ay = Math.sin(shipDirection) * tunedAccel() * dt;
@@ -1373,7 +1390,7 @@ function update(dt) {
   // Update trail positions
   if (trail.visible) {
     const p = ship.position;
-    const shipDirection = ship.rotation.z + Math.PI/2; // Convert sprite rotation to direction
+    const shipDirection = ship.rotation.z + Math.PI/2; // Convert mesh rotation to direction
     const tail = new THREE.Vector3(-Math.cos(shipDirection) * 2.4, -Math.sin(shipDirection) * 2.4, 0).add(p);
     const head = new THREE.Vector3(-Math.cos(shipDirection) * 0.6, -Math.sin(shipDirection) * 0.6, 0).add(p);
     const pts = trail.geometry.attributes.position;
@@ -1390,8 +1407,8 @@ function update(dt) {
     triggerDroneShooting(); // Trigger drone shooting when player shoots
     s.fireCooldown = PLAYER.fireRate / mods.fireRateMul;
     addShake(0.15, 0.06);
-    // muzzle flash
-    const shipDirection = ship.rotation.z + Math.PI/2; // Convert sprite rotation to direction
+    // Muzzle flash particles
+    const shipDirection = ship.rotation.z + Math.PI/2; // Convert mesh rotation to direction
     particles.emitBurst(ship.position.x + Math.cos(shipDirection) * 1.2, ship.position.y + Math.sin(shipDirection) * 1.2, { count: 6, speed: [10, 26], life: [0.08, 0.18], size: [0.18, 0.5], color: 0xffe6aa });
     SFX.play('shoot');
   }
@@ -1441,9 +1458,9 @@ function update(dt) {
     [e.userData.vx, e.userData.vy] = clampMag(e.userData.vx, e.userData.vy, e.userData.maxSpeed);
     e.position.x += e.userData.vx * dt; e.position.y += e.userData.vy * dt; wrap(e);
     
-    // Make boss sprites rotate in the direction they are flying (same as player ship)
+    // Make boss meshes rotate in the direction they are moving
     const moveDirection = Math.atan2(e.userData.vy, e.userData.vx);
-    e.rotation.z = moveDirection - Math.PI/2; // Sprite faces up, adjust like player ship
+    e.rotation.z = moveDirection - Math.PI/2; // Mesh faces up, adjust like player ship
     
     // Bosses no longer shoot - removed shooting logic
   }
@@ -1794,7 +1811,7 @@ function updateShieldVisual() {
 
 // Fire helper that respects mods
 function shoot() {
-  const baseDir = ship.rotation.z + Math.PI/2; // Convert sprite rotation to direction
+  const baseDir = ship.rotation.z + Math.PI/2; // Convert mesh rotation to direction
   const ox = Math.cos(baseDir) * 1.4;
   const oy = Math.sin(baseDir) * 1.4;
   const spawn = (dir) => {
