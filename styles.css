@@ -373,10 +373,6 @@ html, body {
 #hangar .choice-card { cursor:pointer; }
 #hangar .choice-card .cost { margin-top: 8px; font-size: 12px; opacity: .9; }
 #hangar .choice-card.disabled { filter: grayscale(0.6) brightness(0.7); cursor:not-allowed; }
-#hangar .cards { display:grid; grid-template-columns: repeat(4, 280px); gap: 28px; transform: translateY(-10px); }
-#hangar .choice-card { cursor:pointer; }
-#hangar .choice-card .cost { margin-top: 8px; font-size: 12px; opacity: .9; }
-#hangar .choice-card.disabled { filter: grayscale(0.6) brightness(0.7); cursor:not-allowed; }
 
 /* 3D shop cards */
 .choices { margin-top: 10px; }

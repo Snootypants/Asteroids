@@ -466,7 +466,6 @@ const SFX = (() => {
         case 'ricochet': tone(1200, 0.06, 'triangle'); break;
         case 'hit': tone(200, 0.12, 'sawtooth'); break;
         case 'explode': tone(90, 0.2, 'sawtooth'); break;
-        case 'enemy_shoot': tone(520, 0.08, 'square'); break;
         case 'shield': tone(440, 0.18, 'triangle'); break;
         case 'upgrade': tone(660, 0.2, 'square'); setTimeout(()=>tone(990,0.15,'square'),60); break;
         case 'gameover': tone(220, 0.3, 'sawtooth'); break;
@@ -798,6 +797,17 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     return;
   }
+  
+  // Debug toggle: press 't' to spawn a bright marker
+  if (e.key.toLowerCase() === 't') {
+    const g = new THREE.BoxGeometry(2, 2, 2);
+    const m = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true });
+    const cube = new THREE.Mesh(g, m);
+    cube.position.set(0, 0, 0);
+    scene.add(cube);
+    console.log('[Asteroids] Debug cube added at origin');
+  }
+  
   keys.add(e.key.toLowerCase());
   if (e.key === ' ') e.preventDefault();
 });
@@ -808,18 +818,6 @@ const mouse = { enabled: true, lmb: false, rmb: false };
 window.addEventListener('mousedown', (e) => { if (pausedForUpgrade || gameOver) return; if (e.button===0) mouse.lmb=true; if (e.button===2) mouse.rmb=true; });
 window.addEventListener('mouseup', (e) => { if (e.button===0) mouse.lmb=false; if (e.button===2) mouse.rmb=false; });
 window.addEventListener('contextmenu', (e) => { if (!pausedForUpgrade && !gameOver) e.preventDefault(); });
-
-// Debug toggle: press 't' to spawn a bright marker
-window.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 't') {
-    const g = new THREE.BoxGeometry(2, 2, 2);
-    const m = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true });
-    const cube = new THREE.Mesh(g, m);
-    cube.position.set(0, 0, 0);
-    scene.add(cube);
-    console.log('[Asteroids] Debug cube added at origin');
-  }
-});
 
 // State
 let ship = createShip();
@@ -1070,7 +1068,6 @@ function generateShopItems(hasEpicBonus = false) {
     };
     shopCardsEl.appendChild(btn);
   }
-  // attachCard3DInteractions(shopCardsEl); // Function not defined - commented out to prevent crash
   // keyboard quick-pick 1-4
   const onKey=(e)=>{const items=[...shopCardsEl.querySelectorAll('.card-btn')]; if(e.key==='1'&&items[0]) items[0].click(); if(e.key==='2'&&items[1]) items[1].click(); if(e.key==='3'&&items[2]) items[2].click(); if(e.key==='4'&&items[3]) items[3].click();};
   window.addEventListener('keydown', onKey, { once:true });
