@@ -543,19 +543,21 @@ function createShip() {
     }
   );
   
-  // Create ship sprite
-  const shipMaterial = new THREE.SpriteMaterial({ 
+  // Create ship sprite - but sprites don't rotate visually like meshes!
+  // We need to use a PlaneGeometry with the texture instead for proper rotation
+  const shipGeometry = new THREE.PlaneGeometry(3.0, 3.0);
+  const shipMaterial = new THREE.MeshBasicMaterial({ 
     map: shipTexture, 
     transparent: true,
-    opacity: 1.0
+    opacity: 1.0,
+    side: THREE.DoubleSide // Ensure it's visible from both sides
   });
   
-  const mesh = new THREE.Sprite(shipMaterial);
-  mesh.scale.set(3.0, 3.0, 1.0); // Scale to appropriate size
+  const mesh = new THREE.Mesh(shipGeometry, shipMaterial);
   mesh.userData = { kind: 'ship', vx: 0, vy: 0, rot: 0, alive: true, fireCooldown: 0, radius: 1.5 };
   scene.add(mesh);
   
-  console.log('[Asteroids] Ship sprite created, rotation:', mesh.rotation.z);
+  console.log('[Asteroids] Ship mesh created (not sprite), rotation:', mesh.rotation.z);
   return mesh;
 }
 
@@ -731,19 +733,21 @@ function getRandomBossSprite() {
 
 // Enemy hunter
 function createHunter(x, y) {
-  // Use boss sprite instead of cone geometry
+  // Use boss texture on a plane mesh instead of sprite for proper rotation
   const loader = new THREE.TextureLoader();
   const bossSprite = getRandomBossSprite();
   const bossTexture = loader.load(`assets/boss/${bossSprite}`);
   
-  const bossMaterial = new THREE.SpriteMaterial({ 
+  // Create plane geometry with boss texture for proper rotation
+  const bossGeometry = new THREE.PlaneGeometry(4.0, 4.0);
+  const bossMaterial = new THREE.MeshBasicMaterial({ 
     map: bossTexture, 
     transparent: true,
-    opacity: 1.0
+    opacity: 1.0,
+    side: THREE.DoubleSide // Ensure it's visible from both sides
   });
   
-  const mesh = new THREE.Sprite(bossMaterial);
-  mesh.scale.set(4.0, 4.0, 1.0); // Larger than player ship
+  const mesh = new THREE.Mesh(bossGeometry, bossMaterial);
   mesh.position.set(x, y, 0);
   
   // Calculate boss number based on wave (wave 3 = boss 1, wave 6 = boss 2, etc.)
@@ -763,6 +767,7 @@ function createHunter(x, y) {
   scene.add(mesh);
   enemies.push(mesh);
   outlineTargets.push(mesh);
+  console.log('[Asteroids] Boss mesh created (not sprite), rotation:', mesh.rotation.z);
   return mesh;
 }
 
@@ -1314,9 +1319,14 @@ function update(dt) {
     // Only update rotation if mouse is not too close to ship (prevents jitter)
     if (distance > minDistance) {
       const ang = Math.atan2(dy, dx);
-      ship.rotation.z = ang - Math.PI/2; // Sprite faces up, so subtract PI/2 to face right direction
       
-      // Debug info for mouse tracking (remove after testing)
+      // For sprites, we need to adjust the rotation differently
+      // Sprites face up by default, so we point them towards the mouse
+      ship.rotation.z = ang - Math.PI/2; // This should make sprite top face the mouse
+      
+      // Debug info for mouse tracking and verify rotation is being set
+      console.log(`[Asteroids] Setting ship rotation to: ${ship.rotation.z} (${(ship.rotation.z * 180/Math.PI).toFixed(1)}°)`);
+      
       if (window.__status) {
         window.__status.set(`Mouse: screen(${mouseScreen.x.toFixed(0)}, ${mouseScreen.y.toFixed(0)}) world(${w.x.toFixed(1)}, ${w.y.toFixed(1)}) ship(${ship.position.x.toFixed(1)}, ${ship.position.y.toFixed(1)}) angle=${(ship.rotation.z * 180/Math.PI).toFixed(1)}° zoom=${camera.zoom.toFixed(1)}x dist=${distance.toFixed(1)}`);
       }
