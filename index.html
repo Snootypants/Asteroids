@@ -36,14 +36,70 @@
         window.__status = api;
         api.set('Loading modules…');
         window.addEventListener('error', (e)=>{
-          api.set('Error: ' + (e && e.message || 'Unknown error'));
-          api.log((e && e.error && e.error.stack) || String(e.message || e));
+          api.set(`Error: ${e && e.message || 'Unknown error'}`);
+          
+          // Enhanced error reporting
+          let detailedError = '';
+          if (e && e.error) {
+            detailedError = `${e.error.stack || e.message || e}`;
+            
+            // Get error location
+            if (e.filename) {
+              const filenameParts = e.filename.split('/');
+              const filename = filenameParts[filenameParts.length - 1];
+              detailedError = `Error in ${filename} (line ${e.lineno}, col ${e.colno}):\n${detailedError}`;
+            }
+            
+            // Look for missing function references
+            const missingFunctionMatch = detailedError.match(/(\w+) is not defined/);
+            if (missingFunctionMatch && missingFunctionMatch[1]) {
+              detailedError += `\n\nPossible cause: The function "${missingFunctionMatch[1]}" is referenced but not defined yet.`;
+              detailedError += `\nRemember: Functions must be defined before they're called in this codebase.`;
+            }
+            
+            // Look for syntax issues
+            if (detailedError.includes('SyntaxError: Unexpected token')) {
+              detailedError += '\n\nPossible causes:\n- Unmatched brackets or parentheses\n- Missing or extra commas\n- Incomplete function or object definition';
+            }
+          }
+          
+          api.log(detailedError);
           window.__gameBoot = 'error';
+          
+          // Auto-show status console on error
+          api.show();
+          
+          // Force console to expanded state on critical error
+          const statusEl = document.getElementById('status');
+          const collapseBtn = document.getElementById('statusCollapse');
+          if (statusEl && collapseBtn) {
+            statusEl.setAttribute('data-collapsed', 'false');
+            collapseBtn.textContent = '−';
+            collapseBtn.title = 'Collapse Console';
+          }
         });
         window.addEventListener('unhandledrejection', (e)=>{
           api.set('Unhandled promise rejection');
-          api.log(String(e.reason && (e.reason.stack || e.reason.message) || e.reason || e));
+          
+          let detailedError = String(e.reason && (e.reason.stack || e.reason.message) || e.reason || e);
+          
+          // Enhance promise rejection errors
+          detailedError += '\n\nPossible causes:\n- Async operation failed\n- Resource loading error\n- Network request issue';
+          
+          api.log(detailedError);
           window.__gameBoot = 'error';
+          
+          // Auto-show status console on unhandled rejection
+          api.show();
+          
+          // Force console to expanded state on critical error
+          const statusEl = document.getElementById('status');
+          const collapseBtn = document.getElementById('statusCollapse');
+          if (statusEl && collapseBtn) {
+            statusEl.setAttribute('data-collapsed', 'false');
+            collapseBtn.textContent = '−';
+            collapseBtn.title = 'Collapse Console';
+          }
         });
         window.addEventListener('keydown', (e)=>{ if(e.key==='F1' || e.key==='`'){ e.preventDefault(); api.toggle(); }});
         
@@ -97,6 +153,19 @@
             }
           });
         }
+
+        // Ensure toggleLog button is created and functional even if toggleLog element doesn't exist yet
+        window.addEventListener('DOMContentLoaded', () => {
+          let toggleLogBtn = document.getElementById('toggleLog');
+          if (!toggleLogBtn) {
+            toggleLogBtn = document.createElement('button');
+            toggleLogBtn.id = 'toggleLog';
+            toggleLogBtn.title = 'Toggle Log';
+            toggleLogBtn.textContent = 'Log';
+            document.body.appendChild(toggleLogBtn);
+          }
+          toggleLogBtn.onclick = () => api.toggle();
+        });
       })();
     </script>
     <div id="hud">
@@ -192,8 +261,8 @@
     
     <!-- Minimap -->
     <div id="minimap">
-      <div id="minimapTitle">WORLD MAP</div>
-      <canvas id="minimapCanvas" width="200" height="134"></canvas>
+      <div id="minimapTitle">TACTICAL DISPLAY</div>
+      <canvas id="minimapCanvas" width="280" height="187"></canvas>
     </div>
     <!-- End screen overlay -->
     <div id="endOverlay" class="overlay" hidden>
@@ -249,7 +318,7 @@
     <div id="copyright">© 2025 Snootypants. All rights reserved.</div>
     <script type="module" src="src/main.js"></script>
     <script>
-      // Simple loader diagnostic: if the module didn't set the flag,
+      // Enhanced loader diagnostic: if the module didn't set the flag,
       // show a message and hint to check DevTools or network.
       setTimeout(() => {
         if (window.__gameBoot !== 'running') {
@@ -265,9 +334,42 @@
           msg.style.zIndex = '99999';
           msg.textContent = 'Game failed to start. Open DevTools > Console and share the red error lines.';
           document.body.appendChild(msg);
-          if (window.__status) { window.__status.set('Module did not boot'); window.__status.show(); }
+          
+          // Enhanced debugging - attempt to provide more info
+          if (window.__status) { 
+            window.__status.set('Module did not boot'); 
+            window.__status.show();
+            
+            // Force console to expanded state
+            const statusEl = document.getElementById('status');
+            const collapseBtn = document.getElementById('statusCollapse');
+            if (statusEl && collapseBtn) {
+              statusEl.setAttribute('data-collapsed', 'false');
+              collapseBtn.textContent = '−';
+              collapseBtn.title = 'Collapse Console';
+            }
+            
+            // Try to detect common issues
+            window.__status.log('Attempting to diagnose the issue:');
+            
+            // Check for network issues with Three.js CDN
+            if (!window.THREE) {
+              window.__status.log('THREE.js library not loaded - possible CDN connectivity issue.');
+              window.__status.log('Try using a local copy of THREE.js instead of CDN.');
+            }
+            
+            // Check for syntax errors
+            window.__status.log('Looking for syntax errors in the browser console...');
+            
+            // Provide guidance
+            window.__status.log('\nTo fix syntax errors:');
+            window.__status.log('1. Look for unbalanced brackets/braces {}');
+            window.__status.log('2. Check for missing function definitions');
+            window.__status.log('3. Ensure all referenced functions are defined before they are called');
+            window.__status.log('4. Verify all variable references are properly defined');
+          }
         }
-      }, 800);
+      }, 1000);
     </script>
   </body>
   </html>

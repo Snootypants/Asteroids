@@ -130,31 +130,70 @@ html, body {
 
 #status {
   position: fixed;
-  bottom: 20px;
-  left: calc(50% - 250px); /* Position to left of minimap */
-  width: min(45vw, 280px); /* Smaller width to accommodate minimap */
-  max-height: 40vh;
-  background: rgba(8,10,20,0.7);
-  border: 1px solid rgba(120,150,255,0.25);
+  bottom: 70px; /* Increased from 20px to avoid overlapping with the error message at bottom */
+  right: 20px;
+  width: min(50vw, 400px); /* Wider console for better error reporting */
+  max-height: 50vh;
+  background: linear-gradient(145deg, rgba(8,15,25,0.95), rgba(12,20,35,0.95));
+  border: 2px solid rgba(120,150,255,0.6);
   border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
   color: #cfe0ff;
   backdrop-filter: blur(2px);
   overflow: hidden;
   opacity: 0.0;
   pointer-events: none;
   transition: opacity .15s ease-in-out, max-height 0.3s ease;
-  z-index: 10003;
+  z-index: 10999; /* Increased z-index to appear above other UI elements */
+  box-shadow: 0 0 20px rgba(0,10,40,0.5); /* Added shadow for better visibility */
 }
-#status[data-show="1"] { opacity: 1; pointer-events: auto; }
+#status[data-show="1"] { 
+  opacity: 1; 
+  pointer-events: auto; 
+}
 #status[data-collapsed="true"] {
   max-height: 30px;
-  padding: 4px 10px;
+  padding: 4px 14px;
 }
 #status[data-collapsed="true"] #statusLog {
   display: none;
 }
+#statusLine { 
+  font-weight: 600; 
+  margin-bottom: 8px; 
+  color: #a8c0ff; 
+  text-shadow: 0 0 8px rgba(140,170,255,0.35); 
+  font-size: 14px; 
+  padding-right: 50px; /* Make room for buttons */
+}
+#statusLog { 
+  margin: 0; 
+  max-height: 40vh; 
+  overflow: auto; 
+  white-space: pre-wrap; 
+  color: #e7f0ff; 
+  opacity: .9;
+  line-height: 1.4;
+  padding-bottom: 8px;
+  border-top: 1px solid rgba(120,150,255,0.25);
+  padding-top: 8px;
+}
+#statusLog .error-block {
+  background: rgba(255,80,80,0.15);
+  border-left: 3px solid rgba(255,100,100,0.6);
+  padding: 6px 8px;
+  margin: 4px 0;
+  border-radius: 4px;
+}
+#statusLog .hint-block {
+  background: rgba(100,180,255,0.15);
+  border-left: 3px solid rgba(100,180,255,0.6);
+  padding: 6px 8px;
+  margin: 4px 0;
+  border-radius: 4px;
+}
+
 #statusCollapse {
   position: absolute;
   top: 4px;
@@ -198,14 +237,12 @@ html, body {
 #statusCopy:hover {
   background: rgba(120,200,120,0.3);
 }
-#statusLine { font-weight: 600; margin-bottom: 6px; color: #a8c0ff; text-shadow: 0 0 8px rgba(140,170,255,0.35); }
-#statusLog { margin: 0; max-height: 30vh; overflow: auto; white-space: pre-wrap; color: #e7f0ff; opacity: .9; }
 
 #toggleLog {
   position: fixed;
   top: 8px; 
   right: 8px;
-  z-index: 10001;
+  z-index: 11000; /* Increased z-index to be higher than status console */
   background: rgba(12,16,28,0.7);
   color: #cfe0ff;
   border: 1px solid rgba(120,150,255,0.35);
@@ -383,28 +420,37 @@ html, body {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(8,10,20,0.85);
-  border: 2px solid rgba(120,150,255,0.4);
-  border-radius: 8px;
-  padding: 8px;
-  backdrop-filter: blur(3px);
+  background: linear-gradient(145deg, rgba(8,15,25,0.95), rgba(12,20,35,0.95));
+  border: 3px solid rgba(120,150,255,0.5);
+  border-radius: 12px;
+  padding: 12px;
+  backdrop-filter: blur(4px);
+  box-shadow: 
+    0 0 20px rgba(120,150,255,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    inset 0 -1px 0 rgba(0,0,0,0.3);
   z-index: 10001;
 }
 
 #minimapTitle {
   text-align: center;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: bold;
   color: #a8c0ff;
-  margin-bottom: 4px;
-  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 4px rgba(120,150,255,0.4);
+  font-family: 'Courier New', monospace;
 }
 
 #minimapCanvas {
   display: block;
-  border: 1px solid rgba(120,150,255,0.3);
-  border-radius: 4px;
-  background: rgba(2,4,10,0.8);
+  border: 2px solid rgba(120,150,255,0.4);
+  border-radius: 6px;
+  background: rgba(2,4,10,0.9);
+  box-shadow: 
+    inset 0 0 10px rgba(0,0,0,0.5),
+    0 0 8px rgba(120,150,255,0.2);
 }
 
 #gameover h1 {

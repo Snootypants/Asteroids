@@ -13,8 +13,8 @@ window.__gameBoot = 'starting';
 
 // Config
 const WORLD = {
-  width: 90,
-  height: 60,
+  width: 180,  // 4x larger play area (was 90)
+  height: 120,  // 4x larger play area (was 60)
 };
 
 const PLAYER = {
@@ -62,7 +62,7 @@ function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 function wrap(obj) {
   // Use full world bounds regardless of zoom level
   // This means objects wrap around the larger 3x3 total world, not just visible area
-  const zoomFactor = 1 / 0.6; // Use the max zoom-out factor (0.6) to define full world
+  const zoomFactor = 1 / 0.3; // Use the max zoom-out factor (0.3) to define full world
   const hw = (WORLD.width * 0.5) * zoomFactor;
   const hh = (WORLD.height * 0.5) * zoomFactor;
   if (obj.position.x > hw) obj.position.x = -hw;
@@ -93,7 +93,7 @@ if (window.__status) window.__status.log('Renderer: ' + (renderer.capabilities.i
 
 // Orthographic camera for crisp, arcade feel
 const aspect = window.innerWidth / window.innerHeight;
-let currentZoom = 0.6; // Default to fully zoomed out
+let currentZoom = 0.3; // Adjusted for larger world (was 0.6)
 const frustumHeight = WORLD.height;
 const frustumWidth = frustumHeight * aspect;
 const camera = new THREE.OrthographicCamera(
@@ -543,8 +543,8 @@ class MinimapSystem {
   constructor() {
     this.canvas = document.getElementById('minimapCanvas');
     this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
-    this.worldWidth = (WORLD.width * 0.5) * (1 / 0.6); // Full world bounds
-    this.worldHeight = (WORLD.height * 0.5) * (1 / 0.6);
+    this.worldWidth = (WORLD.width * 0.5) * (1 / 0.3); // Full world bounds
+    this.worldHeight = (WORLD.height * 0.5) * (1 / 0.3);
     this.scale = Math.min(this.canvas?.width / (this.worldWidth * 2), this.canvas?.height / (this.worldHeight * 2));
   }
   
@@ -765,7 +765,7 @@ function createBullet(x, y, dir, addVx = 0, addVy = 0) {
   bullet.rotation.z = dir; // Align with direction of travel
   const vx = Math.cos(dir) * BULLET.speed + addVx;
   const vy = Math.sin(dir) * BULLET.speed + addVy;
-  bullet.userData = { kind: 'bullet', vx, vy, life: BULLET.life, radius: BULLET.r };
+  bullet.userData = { kind: 'bullet', vx, vy, life: BULLET.life, radius: BULLET.r, damage: 1 };
   scene.add(bullet);
   return bullet;
 }
@@ -981,6 +981,7 @@ let comboTimer = 0; // time left to sustain combo
 let pausedForUpgrade = false;
 // Drone helpers
 let drones = [];
+let playerShotCounter = 0; // Track player shots for drone shooting
 const comboEl = document.getElementById('combo');
 
 const scoreEl = document.getElementById('score');
@@ -1300,7 +1301,7 @@ function spawnWave() {
   for (let i = 0; i < count; i++) {
     // Spawn asteroids off-screen accounting for full world bounds
     // Use consistent full world bounds (not based on current zoom)
-    const zoomFactor = 1 / 0.6; // Use the max zoom-out factor to define full world
+    const zoomFactor = 1 / 0.3; // Use the max zoom-out factor to define full world
     const visibleWidth = (WORLD.width * 0.5) * zoomFactor;
     const visibleHeight = (WORLD.height * 0.5) * zoomFactor;
     
@@ -1338,7 +1339,7 @@ function spawnEnemiesForWave() {
   const count = Math.min(1 + Math.floor((wave - 2) / 2), 4);
   for (let i = 0; i < count; i++) {
     // Account for full world bounds when spawning enemies - they should appear at safe distance from visible area
-    const zoomFactor = 1 / 0.6; // Use the max zoom-out factor to define full world
+    const zoomFactor = 1 / 0.3; // Use the max zoom-out factor to define full world
     const baseDistance = Math.max(WORLD.width * 0.35, WORLD.height * 0.35) * zoomFactor;
     const maxDistance = Math.max(WORLD.width * 0.48, WORLD.height * 0.48) * zoomFactor;
     const x = randSign() * rand(baseDistance, maxDistance);
@@ -1515,7 +1516,11 @@ function update(dt) {
   const firing = mouse.lmb || fire;
   if (firing && s.fireCooldown <= 0) {
     shoot();
-    triggerDroneShooting(); // Trigger drone shooting when player shoots
+    playerShotCounter++;
+    // Drones shoot every 2nd player shot
+    if (playerShotCounter % 2 === 0) {
+      triggerDroneShooting();
+    }
     s.fireCooldown = PLAYER.fireRate / mods.fireRateMul;
     addShake(0.15, 0.06);
     // Muzzle flash particles
@@ -1541,7 +1546,7 @@ function update(dt) {
     const b = bullets[i];
     if (!b.userData || !b.userData.ricochet) continue;
     // Use same full world bounds as wrap() function
-    const zoomFactor = 1 / 0.6; // Use the max zoom-out factor to define full world
+    const zoomFactor = 1 / 0.3; // Use the max zoom-out factor to define full world
     const hw = (WORLD.width * 0.5) * zoomFactor, hh = (WORLD.height * 0.5) * zoomFactor; let bounced = false;
     if (b.position.x > hw) { b.position.x = hw; b.userData.vx *= -1; bounced = true; }
     if (b.position.x < -hw) { b.position.x = -hw; b.userData.vx *= -1; bounced = true; }
@@ -1995,7 +2000,7 @@ function updateDrones(dt) {
     // Cooldown management
     d.mesh.userData.cd -= dt;
     
-    // Check if drone should shoot (when flagged to shoot next)
+    // Drones shoot automatically at nearest target when player shoots every 2nd time
     if (d.mesh.userData.shouldShootNext && d.mesh.userData.cd <= 0) {
       const target = acquireTarget();
       if (target) {
@@ -2003,13 +2008,12 @@ function updateDrones(dt) {
         const ang = Math.atan2(target.position.y - d.mesh.position.y, target.position.x - d.mesh.position.x);
         const b = createBullet(d.mesh.position.x, d.mesh.position.y, ang, ship.userData.vx * 0.2, ship.userData.vy * 0.2);
         b.userData.pierce = 0;
+        b.userData.damage = 0.5; // Drones do half damage
         bullets.push(b);
         particles.emitBurst(d.mesh.position.x, d.mesh.position.y, { count: 4, speed: [8,14], life: [0.08,0.16], size:[0.15,0.3], color:0x9fffe6 });
         SFX.play('shoot');
-        d.mesh.userData.shouldShootNext = false;
-      } else {
-        d.mesh.userData.cd = 0.25;
       }
+      d.mesh.userData.shouldShootNext = false;
     }
   }
 }
@@ -2017,7 +2021,7 @@ function updateDrones(dt) {
 // Call this when player shoots to trigger drone shooting
 function triggerDroneShooting() {
   drones.forEach(d => {
-    if (d.mesh && Math.random() < 0.33) { // 1/3 chance
+    if (d.mesh) {
       d.mesh.userData.shouldShootNext = true;
     }
   });
