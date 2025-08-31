@@ -58,9 +58,11 @@ const clampMag = (vx, vy, max) => {
 };
 function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 
-// Basic 2D wrapping in X/Y plane (adjusted for zoom)
+// Basic 2D wrapping in X/Y plane (uses full world bounds, not visible area)
 function wrap(obj) {
-  const zoomFactor = 1 / camera.zoom; // Larger world when zoomed out
+  // Use full world bounds regardless of zoom level
+  // This means objects wrap around the larger 3x3 total world, not just visible area
+  const zoomFactor = 1 / 0.6; // Use the max zoom-out factor (0.6) to define full world
   const hw = (WORLD.width * 0.5) * zoomFactor;
   const hh = (WORLD.height * 0.5) * zoomFactor;
   if (obj.position.x > hw) obj.position.x = -hw;
@@ -419,8 +421,8 @@ window.addEventListener('mousemove', (e) => {
 function screenToWorld(sx, sy) {
   const ndcX = (sx / window.innerWidth) * 2 - 1;
   const ndcY = -(sy / window.innerHeight) * 2 + 1;
-  const wx = THREE.MathUtils.mapLinear(ndcX, -1, 1, camera.left, camera.right);
-  const wy = THREE.MathUtils.mapLinear(ndcY, -1, 1, camera.bottom, camera.top);
+  const wx = THREE.MathUtils.mapLinear(ndcX, -1, 1, camera.left, camera.right) + camera.position.x;
+  const wy = THREE.MathUtils.mapLinear(ndcY, -1, 1, camera.bottom, camera.top) + camera.position.y;
   return new THREE.Vector3(wx, wy, 0);
 }
 
@@ -535,6 +537,99 @@ class DebrisSystem {
   }
 }
 const debris = new DebrisSystem(260);
+
+// Minimap System
+class MinimapSystem {
+  constructor() {
+    this.canvas = document.getElementById('minimapCanvas');
+    this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+    this.worldWidth = (WORLD.width * 0.5) * (1 / 0.6); // Full world bounds
+    this.worldHeight = (WORLD.height * 0.5) * (1 / 0.6);
+    this.scale = Math.min(this.canvas?.width / (this.worldWidth * 2), this.canvas?.height / (this.worldHeight * 2));
+  }
+  
+  worldToMinimap(x, y) {
+    if (!this.canvas) return { x: 0, y: 0 };
+    const mapX = (x + this.worldWidth) * this.scale;
+    const mapY = (y + this.worldHeight) * this.scale;
+    return { x: mapX, y: mapY };
+  }
+  
+  render() {
+    if (!this.ctx || !this.canvas) return;
+    
+    // Clear canvas
+    this.ctx.fillStyle = 'rgba(2, 4, 10, 0.9)';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    // Draw world bounds
+    this.ctx.strokeStyle = 'rgba(120, 150, 255, 0.3)';
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    // Draw visible area (current camera view)
+    if (camera && ship) {
+      const visibleWidth = (WORLD.width * 0.5) / camera.zoom;
+      const visibleHeight = (WORLD.height * 0.5) / camera.zoom;
+      const visX1 = (ship.position.x - visibleWidth + this.worldWidth) * this.scale;
+      const visY1 = (ship.position.y - visibleHeight + this.worldHeight) * this.scale;
+      const visX2 = (ship.position.x + visibleWidth + this.worldWidth) * this.scale;
+      const visY2 = (ship.position.y + visibleHeight + this.worldHeight) * this.scale;
+      
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(visX1, visY1, visX2 - visX1, visY2 - visY1);
+    }
+    
+    // Draw asteroids
+    if (asteroids && asteroids.length > 0) {
+      asteroids.forEach(asteroid => {
+        const pos = this.worldToMinimap(asteroid.position.x, asteroid.position.y);
+        const size = asteroid.userData.size === 'large' ? 4 : asteroid.userData.size === 'medium' ? 3 : 2;
+        
+        this.ctx.fillStyle = 'rgba(180, 220, 255, 0.8)';
+        this.ctx.beginPath();
+        this.ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
+    }
+    
+    // Draw enemies
+    if (enemies && enemies.length > 0) {
+      enemies.forEach(enemy => {
+        const pos = this.worldToMinimap(enemy.position.x, enemy.position.y);
+        this.ctx.fillStyle = 'rgba(255, 120, 120, 0.9)';
+        this.ctx.beginPath();
+        this.ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
+    }
+    
+    // Draw player ship
+    if (ship && ship.visible) {
+      const pos = this.worldToMinimap(ship.position.x, ship.position.y);
+      this.ctx.fillStyle = 'rgba(160, 255, 160, 1.0)';
+      this.ctx.beginPath();
+      this.ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      // Draw ship direction indicator
+      const shipDirection = ship.rotation.z + Math.PI/2;
+      const dirX = Math.cos(shipDirection) * 6;
+      const dirY = Math.sin(shipDirection) * 6;
+      this.ctx.strokeStyle = 'rgba(160, 255, 160, 0.8)';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.moveTo(pos.x, pos.y);
+      this.ctx.lineTo(pos.x + dirX, pos.y + dirY);
+      this.ctx.stroke();
+    }
+  }
+}
+
+const minimap = new MinimapSystem();
+console.log('[Asteroids] minimap ready');
+if (window.__status) window.__status.log('Minimap ready');
 
 // Ship
 function createShip() {
@@ -1203,9 +1298,9 @@ function resetGame() {
 function spawnWave() {
   const count = 3 + wave;
   for (let i = 0; i < count; i++) {
-    // Spawn asteroids off-screen accounting for zoom level
-    // Larger world when zoomed out means we need to spawn further away
-    const zoomFactor = 1 / camera.zoom;
+    // Spawn asteroids off-screen accounting for full world bounds
+    // Use consistent full world bounds (not based on current zoom)
+    const zoomFactor = 1 / 0.6; // Use the max zoom-out factor to define full world
     const visibleWidth = (WORLD.width * 0.5) * zoomFactor;
     const visibleHeight = (WORLD.height * 0.5) * zoomFactor;
     
@@ -1242,8 +1337,8 @@ function spawnEnemiesForWave() {
   if (wave < 3) return;
   const count = Math.min(1 + Math.floor((wave - 2) / 2), 4);
   for (let i = 0; i < count; i++) {
-    // Account for zoom when spawning enemies - they should appear at safe distance from visible area
-    const zoomFactor = 1 / camera.zoom;
+    // Account for full world bounds when spawning enemies - they should appear at safe distance from visible area
+    const zoomFactor = 1 / 0.6; // Use the max zoom-out factor to define full world
     const baseDistance = Math.max(WORLD.width * 0.35, WORLD.height * 0.35) * zoomFactor;
     const maxDistance = Math.max(WORLD.width * 0.48, WORLD.height * 0.48) * zoomFactor;
     const x = randSign() * rand(baseDistance, maxDistance);
@@ -1310,14 +1405,30 @@ function tick() {
   if (shakeTime > 0) {
     shakeTime -= dt;
     const t = Math.random() * Math.PI * 2;
-    camera.position.x = Math.cos(t) * shakeMag;
-    camera.position.y = Math.sin(t) * shakeMag;
-  } else {
-    camera.position.x = 0; camera.position.y = 0;
+    const shakeX = Math.cos(t) * shakeMag;
+    const shakeY = Math.sin(t) * shakeMag;
+    // Apply shake as offset to ship-following position
+    if (ship) {
+      camera.position.x = ship.position.x + shakeX;
+      camera.position.y = ship.position.y + shakeY;
+    } else {
+      camera.position.x = shakeX; 
+      camera.position.y = shakeY;
+    }
+  } else if (ship && !paused && !gameOver) {
+    // Normal ship following when not shaking
+    camera.position.x = ship.position.x;
+    camera.position.y = ship.position.y;
   }
 
   particles.update(dt);
   debris.update(dt);
+  
+  // Update minimap
+  if (started && !gameOver) {
+    minimap.render();
+  }
+  
   // frame counter (debug)
   frames++; if (frameEl) frameEl.textContent = String(frames);
   composer.render();
@@ -1429,7 +1540,8 @@ function update(dt) {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     if (!b.userData || !b.userData.ricochet) continue;
-    const zoomFactor = 1 / camera.zoom;
+    // Use same full world bounds as wrap() function
+    const zoomFactor = 1 / 0.6; // Use the max zoom-out factor to define full world
     const hw = (WORLD.width * 0.5) * zoomFactor, hh = (WORLD.height * 0.5) * zoomFactor; let bounced = false;
     if (b.position.x > hw) { b.position.x = hw; b.userData.vx *= -1; bounced = true; }
     if (b.position.x < -hw) { b.position.x = -hw; b.userData.vx *= -1; bounced = true; }

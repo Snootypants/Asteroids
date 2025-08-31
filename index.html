@@ -15,8 +15,9 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="status" role="status" aria-live="polite" data-show="1">
-      <button id="statusCollapse" title="Collapse Console">−</button>
+    <div id="status" role="status" aria-live="polite" data-show="1" data-collapsed="true">
+      <button id="statusCollapse" title="Expand Console">+</button>
+      <button id="statusCopy" title="Copy Console Output">📋</button>
       <div id="statusLine">Booting…</div>
       <pre id="statusLog"></pre>
     </div>
@@ -49,7 +50,14 @@
         // Console collapse functionality
         const statusEl = document.getElementById('status');
         const collapseBtn = document.getElementById('statusCollapse');
-        let isCollapsed = false;
+        const copyBtn = document.getElementById('statusCopy');
+        let isCollapsed = true; // Default to collapsed
+        
+        // Set initial state
+        if (collapseBtn) {
+          collapseBtn.textContent = '+';
+          collapseBtn.title = 'Expand Console';
+        }
         
         if (collapseBtn) {
           collapseBtn.addEventListener('click', () => {
@@ -57,6 +65,36 @@
             statusEl.setAttribute('data-collapsed', isCollapsed.toString());
             collapseBtn.textContent = isCollapsed ? '+' : '−';
             collapseBtn.title = isCollapsed ? 'Expand Console' : 'Collapse Console';
+          });
+        }
+        
+        // Copy console functionality
+        if (copyBtn) {
+          copyBtn.addEventListener('click', async () => {
+            try {
+              const statusLine = line.textContent || '';
+              const statusLog = logEl.textContent || '';
+              const fullText = `Status: ${statusLine}\n\nLog:\n${statusLog}`;
+              
+              await navigator.clipboard.writeText(fullText);
+              
+              // Visual feedback
+              copyBtn.textContent = '✓';
+              copyBtn.style.background = 'rgba(120,255,120,0.4)';
+              setTimeout(() => {
+                copyBtn.textContent = '📋';
+                copyBtn.style.background = 'rgba(120,200,120,0.2)';
+              }, 1000);
+            } catch (err) {
+              console.warn('Failed to copy console output:', err);
+              // Fallback visual feedback
+              copyBtn.textContent = '✗';
+              copyBtn.style.background = 'rgba(255,120,120,0.4)';
+              setTimeout(() => {
+                copyBtn.textContent = '📋';
+                copyBtn.style.background = 'rgba(120,200,120,0.2)';
+              }, 1000);
+            }
           });
         }
       })();
@@ -151,6 +189,12 @@
     </div>
     <div id="frameCounter">0</div>
     <button id="toggleLog" title="Toggle Log">Log</button>
+    
+    <!-- Minimap -->
+    <div id="minimap">
+      <div id="minimapTitle">WORLD MAP</div>
+      <canvas id="minimapCanvas" width="200" height="134"></canvas>
+    </div>
     <!-- End screen overlay -->
     <div id="endOverlay" class="overlay" hidden>
       <img src="assets/gameEnd.png" alt="Game Over" class="overlay-img"/>
