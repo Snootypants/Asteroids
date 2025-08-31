@@ -527,7 +527,21 @@ const debris = new DebrisSystem(260);
 function createShip() {
   // Load ship texture
   const loader = new THREE.TextureLoader();
-  const shipTexture = loader.load('assets/ship/ship.png');
+  const shipTexture = loader.load(
+    'assets/ship/ship.png',
+    // onLoad callback
+    (texture) => {
+      console.log('[Asteroids] Ship texture loaded successfully');
+      if (window.__status) window.__status.log('Ship texture loaded');
+    },
+    // onProgress callback
+    undefined,
+    // onError callback
+    (error) => {
+      console.error('[Asteroids] Failed to load ship texture:', error);
+      if (window.__status) window.__status.log('Ship texture FAILED to load');
+    }
+  );
   
   // Create ship sprite
   const shipMaterial = new THREE.SpriteMaterial({ 
@@ -540,6 +554,8 @@ function createShip() {
   mesh.scale.set(3.0, 3.0, 1.0); // Scale to appropriate size
   mesh.userData = { kind: 'ship', vx: 0, vy: 0, rot: 0, alive: true, fireCooldown: 0, radius: 1.5 };
   scene.add(mesh);
+  
+  console.log('[Asteroids] Ship sprite created, rotation:', mesh.rotation.z);
   return mesh;
 }
 
@@ -1155,23 +1171,27 @@ function resetGame() {
 function spawnWave() {
   const count = 3 + wave;
   for (let i = 0; i < count; i++) {
-    // Spawn asteroids off-screen
-    // World visible area is ±45 width, ±30 height
-    // Add buffer to ensure they start completely outside
-    const buffer = 10;
-    const minX = WORLD.width / 2 + buffer;  // 55 units from center
-    const minY = WORLD.height / 2 + buffer; // 40 units from center
+    // Spawn asteroids off-screen accounting for zoom level
+    // Larger world when zoomed out means we need to spawn further away
+    const zoomFactor = 1 / camera.zoom;
+    const visibleWidth = (WORLD.width * 0.5) * zoomFactor;
+    const visibleHeight = (WORLD.height * 0.5) * zoomFactor;
+    
+    // Add buffer to ensure they start completely outside visible area
+    const buffer = 15 * zoomFactor; // Scale buffer with zoom
+    const minX = visibleWidth + buffer;
+    const minY = visibleHeight + buffer;
     
     // Randomly choose whether to spawn on X or Y boundary
     let x, y;
     if (Math.random() < 0.5) {
       // Spawn on left/right edge
-      x = randSign() * rand(minX, minX + 20);
+      x = randSign() * rand(minX, minX + 20 * zoomFactor);
       y = randSign() * rand(0, minY);
     } else {
       // Spawn on top/bottom edge
       x = randSign() * rand(0, minX);
-      y = randSign() * rand(minY, minY + 20);
+      y = randSign() * rand(minY, minY + 20 * zoomFactor);
     }
     
     // Point toward center with some variation
@@ -1190,8 +1210,12 @@ function spawnEnemiesForWave() {
   if (wave < 3) return;
   const count = Math.min(1 + Math.floor((wave - 2) / 2), 4);
   for (let i = 0; i < count; i++) {
-    const x = randSign() * rand(WORLD.width * 0.35, WORLD.width * 0.48);
-    const y = randSign() * rand(WORLD.height * 0.35, WORLD.height * 0.48);
+    // Account for zoom when spawning enemies - they should appear at safe distance from visible area
+    const zoomFactor = 1 / camera.zoom;
+    const baseDistance = Math.max(WORLD.width * 0.35, WORLD.height * 0.35) * zoomFactor;
+    const maxDistance = Math.max(WORLD.width * 0.48, WORLD.height * 0.48) * zoomFactor;
+    const x = randSign() * rand(baseDistance, maxDistance);
+    const y = randSign() * rand(baseDistance, maxDistance);
     spawnBeacon(x, y, 1.1 + Math.random()*0.4, () => createHunter(x, y));
   }
 }
@@ -1284,10 +1308,18 @@ function update(dt) {
     const dy = w.y - ship.position.y;
     const distance = Math.hypot(dx, dy);
     
+    // Scale minimum distance with zoom - closer when zoomed in, further when zoomed out
+    const minDistance = 0.5 / camera.zoom;
+    
     // Only update rotation if mouse is not too close to ship (prevents jitter)
-    if (distance > 0.5) {
+    if (distance > minDistance) {
       const ang = Math.atan2(dy, dx);
       ship.rotation.z = ang - Math.PI/2; // Sprite faces up, so subtract PI/2 to face right direction
+      
+      // Debug info for mouse tracking (remove after testing)
+      if (window.__status) {
+        window.__status.set(`Mouse: screen(${mouseScreen.x.toFixed(0)}, ${mouseScreen.y.toFixed(0)}) world(${w.x.toFixed(1)}, ${w.y.toFixed(1)}) ship(${ship.position.x.toFixed(1)}, ${ship.position.y.toFixed(1)}) angle=${(ship.rotation.z * 180/Math.PI).toFixed(1)}° zoom=${camera.zoom.toFixed(1)}x dist=${distance.toFixed(1)}`);
+      }
     }
   }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
