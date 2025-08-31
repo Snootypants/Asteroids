@@ -396,7 +396,13 @@ if (window.__status) window.__status.log('Particles ready');
 const reticleEl = document.getElementById('reticle');
 let mouseScreen = { x: window.innerWidth/2, y: window.innerHeight/2 };
 function setReticle(x, y, show = true) { if (!reticleEl) return; reticleEl.style.left = `${x}px`; reticleEl.style.top = `${y}px`; reticleEl.hidden = !show; }
-window.addEventListener('mousemove', (e) => { mouseScreen.x = e.clientX; mouseScreen.y = e.clientY; if (!pausedForUpgrade && !gameOver) setReticle(mouseScreen.x, mouseScreen.y, true); });
+window.addEventListener('mousemove', (e) => { 
+  mouseScreen.x = e.clientX; 
+  mouseScreen.y = e.clientY; 
+  if (!pausedForUpgrade && !gameOver && !paused && started) {
+    setReticle(mouseScreen.x, mouseScreen.y, true); 
+  }
+});
 function screenToWorld(sx, sy) {
   const ndcX = (sx / window.innerWidth) * 2 - 1;
   const ndcY = - (sy / window.innerHeight) * 2 + 1;
@@ -571,21 +577,22 @@ function updateBoostFlames(flames, ship, thrusting, dt) {
   
   if (thrusting) {
     // Position flames behind ship (opposite direction of ship facing)
-    const flameDistance = -2.2;
+    const flameDistance = 2.2; // Distance behind ship
     const flameOffset = 0.3;
     
-    // Ship sprite faces up, rotation.z gives rotation from up, add PI/2 for forward direction
-    const shipDirection = ship.rotation.z + Math.PI/2;
+    // Ship sprite faces up by default, rotation.z is the ship's facing direction
+    const shipDirection = ship.rotation.z + Math.PI/2; // Convert to movement direction
     
+    // Place flames behind ship (opposite of movement direction)
     flame1.position.set(
-      ship.position.x + Math.cos(shipDirection + Math.PI) * flameDistance,
-      ship.position.y + Math.sin(shipDirection + Math.PI) * flameDistance + flameOffset,
+      ship.position.x - Math.cos(shipDirection) * flameDistance,
+      ship.position.y - Math.sin(shipDirection) * flameDistance + flameOffset,
       ship.position.z
     );
     
     flame2.position.set(
-      ship.position.x + Math.cos(shipDirection + Math.PI) * flameDistance,
-      ship.position.y + Math.sin(shipDirection + Math.PI) * flameDistance - flameOffset,
+      ship.position.x - Math.cos(shipDirection) * flameDistance,
+      ship.position.y - Math.sin(shipDirection) * flameDistance - flameOffset,
       ship.position.z
     );
     
@@ -1274,10 +1281,17 @@ function update(dt) {
   // Ship controls
   const s = ship.userData;
   // Aim at current cursor position (world projection)
-  if (mouse.enabled && !pausedForUpgrade) {
+  if (mouse.enabled && !pausedForUpgrade && !paused && started && !gameOver) {
     const w = screenToWorld(mouseScreen.x, mouseScreen.y);
-    const ang = Math.atan2(w.y - ship.position.y, w.x - ship.position.x);
-    ship.rotation.z = ang - Math.PI/2; // Sprite faces up by default, subtract PI/2 to face mouse
+    const dx = w.x - ship.position.x;
+    const dy = w.y - ship.position.y;
+    const distance = Math.hypot(dx, dy);
+    
+    // Only update rotation if mouse is not too close to ship (prevents jitter)
+    if (distance > 0.5) {
+      const ang = Math.atan2(dy, dx);
+      ship.rotation.z = ang - Math.PI/2; // Sprite faces up, so subtract PI/2 to face right direction
+    }
   }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
   const turnRight = keys.has('d') || keys.has('arrowright');
@@ -1291,8 +1305,8 @@ function update(dt) {
 
   const thrusting = mouse.rmb || thrust;
   if (thrusting) {
-    // Ship sprite faces up, rotation.z gives the rotation from up, add PI/2 for direction
-    const shipDirection = ship.rotation.z + Math.PI/2;
+    // Ship sprite faces up, rotation.z is already the direction to move
+    const shipDirection = ship.rotation.z + Math.PI/2; // Convert ship rotation to movement direction
     const ax = Math.cos(shipDirection) * tunedAccel() * dt;
     const ay = Math.sin(shipDirection) * tunedAccel() * dt;
     s.vx += ax; s.vy += ay;
@@ -1390,7 +1404,7 @@ function update(dt) {
     
     // Make boss sprites rotate in the direction they are flying (same as player ship)
     const moveDirection = Math.atan2(e.userData.vy, e.userData.vx);
-    e.rotation.z = moveDirection - Math.PI/2; // Adjust for sprite facing up by default
+    e.rotation.z = moveDirection - Math.PI/2; // Sprite faces up, adjust like player ship
     
     // Bosses no longer shoot - removed shooting logic
   }
