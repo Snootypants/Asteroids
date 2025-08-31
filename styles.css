@@ -430,6 +430,12 @@ html, body {
     inset 0 1px 0 rgba(255,255,255,0.1),
     inset 0 -1px 0 rgba(0,0,0,0.3);
   z-index: 10001;
+  opacity: 0.5; /* Default to 50% opacity */
+  transition: opacity 0.3s ease; /* Smooth transition */
+}
+
+#minimap.focused {
+  opacity: 1.0; /* 100% when focused */
 }
 
 #minimapTitle {

@@ -62,7 +62,7 @@ function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 function wrap(obj) {
   // Use full world bounds regardless of zoom level
   // This means objects wrap around the larger 3x3 total world, not just visible area
-  const zoomFactor = 1 / 0.3; // Use the max zoom-out factor (0.3) to define full world
+  const zoomFactor = 1 / 1.0; // Use the max zoom-out factor (1.0) to define full world
   const hw = (WORLD.width * 0.5) * zoomFactor;
   const hh = (WORLD.height * 0.5) * zoomFactor;
   if (obj.position.x > hw) obj.position.x = -hw;
@@ -93,7 +93,7 @@ if (window.__status) window.__status.log('Renderer: ' + (renderer.capabilities.i
 
 // Orthographic camera for crisp, arcade feel
 const aspect = window.innerWidth / window.innerHeight;
-let currentZoom = 0.3; // Adjusted for larger world (was 0.6)
+let currentZoom = 1.0; // Show about 1/4 of total world area
 const frustumHeight = WORLD.height;
 const frustumWidth = frustumHeight * aspect;
 const camera = new THREE.OrthographicCamera(
@@ -543,15 +543,15 @@ class MinimapSystem {
   constructor() {
     this.canvas = document.getElementById('minimapCanvas');
     this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
-    this.worldWidth = (WORLD.width * 0.5) * (1 / 0.3); // Full world bounds
-    this.worldHeight = (WORLD.height * 0.5) * (1 / 0.3);
+    this.worldWidth = (WORLD.width * 0.5) * (1 / 1.0); // Full world bounds
+    this.worldHeight = (WORLD.height * 0.5) * (1 / 1.0);
     this.scale = Math.min(this.canvas?.width / (this.worldWidth * 2), this.canvas?.height / (this.worldHeight * 2));
   }
   
   worldToMinimap(x, y) {
     if (!this.canvas) return { x: 0, y: 0 };
     const mapX = (x + this.worldWidth) * this.scale;
-    const mapY = (y + this.worldHeight) * this.scale;
+    const mapY = this.canvas.height - (y + this.worldHeight) * this.scale; // Flip Y coordinate
     return { x: mapX, y: mapY };
   }
   
@@ -616,7 +616,7 @@ class MinimapSystem {
       // Draw ship direction indicator
       const shipDirection = ship.rotation.z + Math.PI/2;
       const dirX = Math.cos(shipDirection) * 6;
-      const dirY = Math.sin(shipDirection) * 6;
+      const dirY = -Math.sin(shipDirection) * 6; // Flip Y for minimap coordinate system
       this.ctx.strokeStyle = 'rgba(160, 255, 160, 0.8)';
       this.ctx.lineWidth = 2;
       this.ctx.beginPath();
@@ -1301,7 +1301,7 @@ function spawnWave() {
   for (let i = 0; i < count; i++) {
     // Spawn asteroids off-screen accounting for full world bounds
     // Use consistent full world bounds (not based on current zoom)
-    const zoomFactor = 1 / 0.3; // Use the max zoom-out factor to define full world
+    const zoomFactor = 1 / 1.0; // Use the max zoom-out factor to define full world
     const visibleWidth = (WORLD.width * 0.5) * zoomFactor;
     const visibleHeight = (WORLD.height * 0.5) * zoomFactor;
     
@@ -1339,7 +1339,7 @@ function spawnEnemiesForWave() {
   const count = Math.min(1 + Math.floor((wave - 2) / 2), 4);
   for (let i = 0; i < count; i++) {
     // Account for full world bounds when spawning enemies - they should appear at safe distance from visible area
-    const zoomFactor = 1 / 0.3; // Use the max zoom-out factor to define full world
+    const zoomFactor = 1 / 1.0; // Use the max zoom-out factor to define full world
     const baseDistance = Math.max(WORLD.width * 0.35, WORLD.height * 0.35) * zoomFactor;
     const maxDistance = Math.max(WORLD.width * 0.48, WORLD.height * 0.48) * zoomFactor;
     const x = randSign() * rand(baseDistance, maxDistance);
@@ -1546,7 +1546,7 @@ function update(dt) {
     const b = bullets[i];
     if (!b.userData || !b.userData.ricochet) continue;
     // Use same full world bounds as wrap() function
-    const zoomFactor = 1 / 0.3; // Use the max zoom-out factor to define full world
+    const zoomFactor = 1 / 1.0; // Use the max zoom-out factor to define full world
     const hw = (WORLD.width * 0.5) * zoomFactor, hh = (WORLD.height * 0.5) * zoomFactor; let bounced = false;
     if (b.position.x > hw) { b.position.x = hw; b.userData.vx *= -1; bounced = true; }
     if (b.position.x < -hw) { b.position.x = -hw; b.userData.vx *= -1; bounced = true; }
@@ -1789,6 +1789,15 @@ window.addEventListener('keydown', (e) => {
     ship.visible = true;
     resetGame();
     started = true; // restart immediately
+  }
+  
+  // Tab key toggles minimap opacity
+  if (e.key === 'Tab') {
+    e.preventDefault(); // Prevent default tab behavior
+    const minimapEl = document.getElementById('minimap');
+    if (minimapEl) {
+      minimapEl.classList.toggle('focused');
+    }
   }
 });
 
