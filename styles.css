@@ -127,10 +127,38 @@ html, body {
   overflow: hidden;
   opacity: 0.0;
   pointer-events: none;
-  transition: opacity .15s ease-in-out;
+  transition: opacity .15s ease-in-out, max-height 0.3s ease;
   z-index: 10003;
 }
 #status[data-show="1"] { opacity: 1; pointer-events: auto; }
+#status[data-collapsed="true"] {
+  max-height: 30px;
+  padding: 4px 10px;
+}
+#status[data-collapsed="true"] #statusLog {
+  display: none;
+}
+#statusCollapse {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  background: rgba(120,150,255,0.2);
+  border: 1px solid rgba(120,150,255,0.4);
+  border-radius: 4px;
+  color: #cfe0ff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+#statusCollapse:hover {
+  background: rgba(120,150,255,0.3);
+}
 #statusLine { font-weight: 600; margin-bottom: 6px; color: #a8c0ff; text-shadow: 0 0 8px rgba(140,170,255,0.35); }
 #statusLog { margin: 0; max-height: 30vh; overflow: auto; white-space: pre-wrap; color: #e7f0ff; opacity: .9; }
 
