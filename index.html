@@ -97,6 +97,58 @@
     </div>
     <!-- Mouse-mode reticle -->
     <div id="reticle" hidden></div>
+    
+    <!-- Pause screen overlay -->
+    <div id="pause" class="overlay" hidden>
+      <div class="overlay-center">
+        <h1>PAUSED</h1>
+        <div style="display: grid; gap: 24px; max-width: 600px; margin: 0 auto; text-align: left;">
+          
+          <!-- Sound Settings -->
+          <div style="background: rgba(20,30,60,0.8); border: 1px solid rgba(120,150,255,0.3); border-radius: 8px; padding: 16px;">
+            <h3 style="margin: 0 0 12px; color: #e8f0ff;">Sound Settings</h3>
+            <div style="display: grid; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <label for="pauseSfxVol" style="min-width: 60px;">SFX Volume:</label>
+                <input id="pauseSfxVol" type="range" min="0" max="100" value="80" style="flex: 1;" />
+                <span id="sfxVolValue" style="min-width: 40px; font-size: 14px;">80%</span>
+              </div>
+              <button id="pauseSfxMute" type="button" style="padding: 6px 12px; background: rgba(60,20,20,0.8); border: 1px solid rgba(255,120,120,0.4); color: #ffe8e8; border-radius: 4px; cursor: pointer;">Toggle Mute</button>
+            </div>
+          </div>
+          
+          <!-- Controls -->
+          <div style="background: rgba(20,30,60,0.8); border: 1px solid rgba(120,150,255,0.3); border-radius: 8px; padding: 16px;">
+            <h3 style="margin: 0 0 12px; color: #e8f0ff;">Controls</h3>
+            <div style="display: grid; gap: 4px; font-size: 14px; line-height: 1.4;">
+              <div><strong>W/A/S/D or Arrow Keys:</strong> Move ship</div>
+              <div><strong>Space:</strong> Shoot</div>
+              <div><strong>Mouse:</strong> Aim and move (click to enable)</div>
+              <div><strong>Left Click:</strong> Shoot (in mouse mode)</div>
+              <div><strong>Right Click:</strong> Thrust (in mouse mode)</div>
+              <div><strong>Q/A:</strong> Zoom in/out</div>
+              <div><strong>R:</strong> Restart game</div>
+              <div><strong>ESC:</strong> Pause/Unpause</div>
+              <div><strong>F1 or `:</strong> Toggle debug console</div>
+            </div>
+          </div>
+          
+          <!-- Game Info -->
+          <div style="background: rgba(20,30,60,0.8); border: 1px solid rgba(120,150,255,0.3); border-radius: 8px; padding: 16px;">
+            <h3 style="margin: 0 0 12px; color: #e8f0ff;">Game Info</h3>
+            <div style="display: grid; gap: 4px; font-size: 14px; line-height: 1.4;">
+              <div>• Destroy asteroids to earn salvage and ores</div>
+              <div>• Chain kills for combo multipliers</div>
+              <div>• Choose upgrades between waves</div>
+              <div>• Visit the hangar every 3rd wave to spend currency</div>
+              <div>• Boss enemies appear starting wave 3</div>
+            </div>
+          </div>
+          
+        </div>
+        <p style="margin-top: 24px; opacity: 0.8;">Press ESC to resume</p>
+      </div>
+    </div>
     <div id="frameCounter">0</div>
     <button id="toggleLog" title="Toggle Log">Log</button>
     <!-- End screen overlay -->

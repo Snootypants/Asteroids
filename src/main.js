@@ -58,10 +58,11 @@ const clampMag = (vx, vy, max) => {
 };
 function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 
-// Basic 2D wrapping in X/Y plane
+// Basic 2D wrapping in X/Y plane (adjusted for zoom)
 function wrap(obj) {
-  const hw = WORLD.width * 0.5;
-  const hh = WORLD.height * 0.5;
+  const zoomFactor = 1 / camera.zoom; // Larger world when zoomed out
+  const hw = (WORLD.width * 0.5) * zoomFactor;
+  const hh = (WORLD.height * 0.5) * zoomFactor;
   if (obj.position.x > hw) obj.position.x = -hw;
   if (obj.position.x < -hw) obj.position.x = hw;
   if (obj.position.y > hh) obj.position.y = -hh;
@@ -90,6 +91,7 @@ if (window.__status) window.__status.log('Renderer: ' + (renderer.capabilities.i
 
 // Orthographic camera for crisp, arcade feel
 const aspect = window.innerWidth / window.innerHeight;
+let currentZoom = 0.6; // Default to fully zoomed out
 const frustumHeight = WORLD.height;
 const frustumWidth = frustumHeight * aspect;
 const camera = new THREE.OrthographicCamera(
@@ -102,6 +104,8 @@ const camera = new THREE.OrthographicCamera(
 );
 camera.position.set(0, 0, 10);
 camera.lookAt(0, 0, 0);
+camera.zoom = currentZoom;
+camera.updateProjectionMatrix();
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x02040a, 0.004);
@@ -254,8 +258,16 @@ window.addEventListener('resize', onResize);
 // Zoom controls (Q = zoom in, A = zoom out)
 window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
-  if (k === 'q') { camera.zoom = Math.min(1.8, camera.zoom + 0.1); camera.updateProjectionMatrix(); }
-  if (k === 'a') { camera.zoom = Math.max(0.6, camera.zoom - 0.1); camera.updateProjectionMatrix(); }
+  if (k === 'q') { 
+    currentZoom = Math.min(1.8, currentZoom + 0.1); 
+    camera.zoom = currentZoom; 
+    camera.updateProjectionMatrix(); 
+  }
+  if (k === 'a') { 
+    currentZoom = Math.max(0.6, currentZoom - 0.1); 
+    camera.zoom = currentZoom; 
+    camera.updateProjectionMatrix(); 
+  }
 });
 
 // Materials
@@ -562,8 +574,8 @@ function updateBoostFlames(flames, ship, thrusting, dt) {
     const flameDistance = -2.2;
     const flameOffset = 0.3;
     
-    // Ship sprite points up by default, rotation.z directly gives direction
-    const shipDirection = ship.rotation.z;
+    // Ship sprite faces up, rotation.z gives rotation from up, add PI/2 for forward direction
+    const shipDirection = ship.rotation.z + Math.PI/2;
     
     flame1.position.set(
       ship.position.x + Math.cos(shipDirection + Math.PI) * flameDistance,
@@ -770,8 +782,14 @@ const afterUpdates = new Set();
 // Input
 const keys = new Set();
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.pointerLockElement === renderer.domElement) {
-    document.exitPointerLock?.();
+  if (e.key === 'Escape') {
+    if (document.pointerLockElement === renderer.domElement) {
+      document.exitPointerLock?.();
+    } else if (started && !gameOver && !pausedForUpgrade) {
+      togglePause();
+    }
+    e.preventDefault();
+    return;
   }
   keys.add(e.key.toLowerCase());
   if (e.key === ' ') e.preventDefault();
@@ -808,6 +826,7 @@ let pickups = [];
 let score = 0;
 let wave = 1;
 let gameOver = false;
+let paused = false; // Add pause state
 let invuln = 0; // seconds of spawn invulnerability
 let combo = 1;
 let comboTimer = 0; // time left to sustain combo
@@ -1226,7 +1245,7 @@ function tick() {
   let dt = now - last; last = now;
   dt = Math.min(dt, 0.033); // clamp
 
-  if (started && !gameOver && !pausedForUpgrade) update(dt);
+  if (started && !gameOver && !pausedForUpgrade && !paused) update(dt);
 
   if (shakeTime > 0) {
     shakeTime -= dt;
@@ -1258,7 +1277,7 @@ function update(dt) {
   if (mouse.enabled && !pausedForUpgrade) {
     const w = screenToWorld(mouseScreen.x, mouseScreen.y);
     const ang = Math.atan2(w.y - ship.position.y, w.x - ship.position.x);
-    ship.rotation.z = ang; // Sprites face up by default, but we want mouse direction
+    ship.rotation.z = ang - Math.PI/2; // Sprite faces up by default, subtract PI/2 to face mouse
   }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
   const turnRight = keys.has('d') || keys.has('arrowright');
@@ -1272,8 +1291,8 @@ function update(dt) {
 
   const thrusting = mouse.rmb || thrust;
   if (thrusting) {
-    // Ship sprite points up by default, rotation.z directly gives direction
-    const shipDirection = ship.rotation.z;
+    // Ship sprite faces up, rotation.z gives the rotation from up, add PI/2 for direction
+    const shipDirection = ship.rotation.z + Math.PI/2;
     const ax = Math.cos(shipDirection) * tunedAccel() * dt;
     const ay = Math.sin(shipDirection) * tunedAccel() * dt;
     s.vx += ax; s.vy += ay;
@@ -1301,8 +1320,9 @@ function update(dt) {
   // Update trail positions
   if (trail.visible) {
     const p = ship.position;
-    const tail = new THREE.Vector3(-Math.cos(ship.rotation.z) * 2.4, -Math.sin(ship.rotation.z) * 2.4, 0).add(p);
-    const head = new THREE.Vector3(-Math.cos(ship.rotation.z) * 0.6, -Math.sin(ship.rotation.z) * 0.6, 0).add(p);
+    const shipDirection = ship.rotation.z + Math.PI/2; // Convert sprite rotation to direction
+    const tail = new THREE.Vector3(-Math.cos(shipDirection) * 2.4, -Math.sin(shipDirection) * 2.4, 0).add(p);
+    const head = new THREE.Vector3(-Math.cos(shipDirection) * 0.6, -Math.sin(shipDirection) * 0.6, 0).add(p);
     const pts = trail.geometry.attributes.position;
     pts.setXYZ(0, head.x, head.y, 0);
     pts.setXYZ(1, tail.x, tail.y, 0);
@@ -1318,7 +1338,8 @@ function update(dt) {
     s.fireCooldown = PLAYER.fireRate / mods.fireRateMul;
     addShake(0.15, 0.06);
     // muzzle flash
-    particles.emitBurst(ship.position.x + Math.cos(ship.rotation.z) * 1.2, ship.position.y + Math.sin(ship.rotation.z) * 1.2, { count: 6, speed: [10, 26], life: [0.08, 0.18], size: [0.18, 0.5], color: 0xffe6aa });
+    const shipDirection = ship.rotation.z + Math.PI/2; // Convert sprite rotation to direction
+    particles.emitBurst(ship.position.x + Math.cos(shipDirection) * 1.2, ship.position.y + Math.sin(shipDirection) * 1.2, { count: 6, speed: [10, 26], life: [0.08, 0.18], size: [0.18, 0.5], color: 0xffe6aa });
     SFX.play('shoot');
   }
 
@@ -1338,7 +1359,8 @@ function update(dt) {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     if (!b.userData || !b.userData.ricochet) continue;
-    const hw = WORLD.width * 0.5, hh = WORLD.height * 0.5; let bounced = false;
+    const zoomFactor = 1 / camera.zoom;
+    const hw = (WORLD.width * 0.5) * zoomFactor, hh = (WORLD.height * 0.5) * zoomFactor; let bounced = false;
     if (b.position.x > hw) { b.position.x = hw; b.userData.vx *= -1; bounced = true; }
     if (b.position.x < -hw) { b.position.x = -hw; b.userData.vx *= -1; bounced = true; }
     if (b.position.y > hh) { b.position.y = hh; b.userData.vy *= -1; bounced = true; }
@@ -1368,7 +1390,7 @@ function update(dt) {
     
     // Make boss sprites rotate in the direction they are flying (same as player ship)
     const moveDirection = Math.atan2(e.userData.vy, e.userData.vx);
-    e.rotation.z = moveDirection;
+    e.rotation.z = moveDirection - Math.PI/2; // Adjust for sprite facing up by default
     
     // Bosses no longer shoot - removed shooting logic
   }
@@ -1525,6 +1547,55 @@ function die(reason = 'Destroyed') {
   SFX.play('gameover');
 }
 
+function togglePause() {
+  paused = !paused;
+  const pauseEl = document.getElementById('pause');
+  if (pauseEl) {
+    if (paused) {
+      pauseEl.hidden = false;
+      pauseEl.classList.add('show');
+      pauseEl.classList.remove('hide');
+      setCanvasBlur(true);
+      
+      // Sync audio controls with main HUD
+      syncAudioControls();
+    } else {
+      pauseEl.classList.remove('show');
+      pauseEl.classList.add('hide');
+      setTimeout(() => pauseEl.hidden = true, 350);
+      setCanvasBlur(false);
+    }
+  }
+}
+
+function syncAudioControls() {
+  const mainSfxVol = document.getElementById('sfxVol');
+  const pauseSfxVol = document.getElementById('pauseSfxVol');
+  const sfxVolValue = document.getElementById('sfxVolValue');
+  
+  if (mainSfxVol && pauseSfxVol && sfxVolValue) {
+    pauseSfxVol.value = mainSfxVol.value;
+    sfxVolValue.textContent = mainSfxVol.value + '%';
+    
+    // Sync changes both ways
+    pauseSfxVol.oninput = () => {
+      mainSfxVol.value = pauseSfxVol.value;
+      sfxVolValue.textContent = pauseSfxVol.value + '%';
+      // Trigger any existing SFX volume change handlers
+      if (mainSfxVol.oninput) mainSfxVol.oninput();
+    };
+  }
+  
+  // Handle mute button
+  const pauseMuteBtn = document.getElementById('pauseSfxMute');
+  const mainMuteBtn = document.getElementById('sfxMute');
+  if (pauseMuteBtn && mainMuteBtn) {
+    pauseMuteBtn.onclick = () => {
+      if (mainMuteBtn.onclick) mainMuteBtn.onclick();
+    };
+  }
+}
+
 // Restart
 window.addEventListener('keydown', (e) => {
   if (e.key.toLowerCase() === 'r') {
@@ -1670,7 +1741,7 @@ function updateShieldVisual() {
 
 // Fire helper that respects mods
 function shoot() {
-  const baseDir = ship.rotation.z;
+  const baseDir = ship.rotation.z + Math.PI/2; // Convert sprite rotation to direction
   const ox = Math.cos(baseDir) * 1.4;
   const oy = Math.sin(baseDir) * 1.4;
   const spawn = (dir) => {
