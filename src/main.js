@@ -558,19 +558,22 @@ function updateBoostFlames(flames, ship, thrusting, dt) {
   const [flame1, flame2] = flames;
   
   if (thrusting) {
-    // Position flames behind ship
+    // Position flames behind ship (opposite direction of ship facing)
     const flameDistance = -2.2;
     const flameOffset = 0.3;
     
+    // Ship sprite points up by default, rotation.z directly gives direction
+    const shipDirection = ship.rotation.z;
+    
     flame1.position.set(
-      ship.position.x + Math.cos(ship.rotation.z + Math.PI) * flameDistance,
-      ship.position.y + Math.sin(ship.rotation.z + Math.PI) * flameDistance + flameOffset,
+      ship.position.x + Math.cos(shipDirection + Math.PI) * flameDistance,
+      ship.position.y + Math.sin(shipDirection + Math.PI) * flameDistance + flameOffset,
       ship.position.z
     );
     
     flame2.position.set(
-      ship.position.x + Math.cos(ship.rotation.z + Math.PI) * flameDistance,
-      ship.position.y + Math.sin(ship.rotation.z + Math.PI) * flameDistance - flameOffset,
+      ship.position.x + Math.cos(shipDirection + Math.PI) * flameDistance,
+      ship.position.y + Math.sin(shipDirection + Math.PI) * flameDistance - flameOffset,
       ship.position.z
     );
     
@@ -670,18 +673,50 @@ function chooseOreType(){
   return 'iron';
 }
 
+// Boss sprite system
+let bossSprites = [
+  'boss1.png', 'boss2.png', 'boss3.png', 'boss4.png', 'boss5.png',
+  'boss6.png', 'boss7.png', 'boss8.png', 'boss9.png', 'boss10.png'
+];
+let availableBossSprites = [...bossSprites]; // Copy for tracking
+
+function getRandomBossSprite() {
+  if (availableBossSprites.length === 0) {
+    // Reset the pool when all sprites have been used
+    availableBossSprites = [...bossSprites];
+  }
+  
+  const randomIndex = Math.floor(Math.random() * availableBossSprites.length);
+  const selectedSprite = availableBossSprites[randomIndex];
+  
+  // Remove from available pool
+  availableBossSprites.splice(randomIndex, 1);
+  
+  return selectedSprite;
+}
+
 // Enemy hunter
 function createHunter(x, y) {
-  const g = new THREE.ConeGeometry(1.0, 2.0, 3);
-  g.rotateX(Math.PI / 2);
-  // Default cone points +Z; rotate so it faces +X like our ship rotation math
-  g.rotateZ(Math.PI);
-  const mesh = new THREE.Mesh(g, enemyMat.clone());
+  // Use boss sprite instead of cone geometry
+  const loader = new THREE.TextureLoader();
+  const bossSprite = getRandomBossSprite();
+  const bossTexture = loader.load(`assets/boss/${bossSprite}`);
+  
+  const bossMaterial = new THREE.SpriteMaterial({ 
+    map: bossTexture, 
+    transparent: true,
+    opacity: 1.0
+  });
+  
+  const mesh = new THREE.Sprite(bossMaterial);
+  mesh.scale.set(4.0, 4.0, 1.0); // Larger than player ship
   mesh.position.set(x, y, 0);
+  
   // Calculate boss number based on wave (wave 3 = boss 1, wave 6 = boss 2, etc.)
   const bossNumber = Math.floor(wave / 3);
   // Each boss is 20% faster than the previous one
   const speedMultiplier = 1 + (bossNumber - 1) * 0.2;
+  
   mesh.userData = { 
     kind: 'enemy', 
     vx: 0, 
@@ -690,6 +725,7 @@ function createHunter(x, y) {
     maxSpeed: ENEMY.maxSpeed * speedMultiplier,
     accel: ENEMY.accel * speedMultiplier
   };
+  
   scene.add(mesh);
   enemies.push(mesh);
   outlineTargets.push(mesh);
@@ -1222,7 +1258,7 @@ function update(dt) {
   if (mouse.enabled && !pausedForUpgrade) {
     const w = screenToWorld(mouseScreen.x, mouseScreen.y);
     const ang = Math.atan2(w.y - ship.position.y, w.x - ship.position.x);
-    ship.rotation.z = ang;
+    ship.rotation.z = ang; // Sprites face up by default, but we want mouse direction
   }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
   const turnRight = keys.has('d') || keys.has('arrowright');
@@ -1236,13 +1272,15 @@ function update(dt) {
 
   const thrusting = mouse.rmb || thrust;
   if (thrusting) {
-    const ax = Math.cos(ship.rotation.z) * tunedAccel() * dt;
-    const ay = Math.sin(ship.rotation.z) * tunedAccel() * dt;
+    // Ship sprite points up by default, rotation.z directly gives direction
+    const shipDirection = ship.rotation.z;
+    const ax = Math.cos(shipDirection) * tunedAccel() * dt;
+    const ay = Math.sin(shipDirection) * tunedAccel() * dt;
     s.vx += ax; s.vy += ay;
     trail.visible = true;
     // occasional engine particles
     if (Math.random() < 0.5) {
-      particles.emitBurst(ship.position.x - Math.cos(ship.rotation.z) * 1.2, ship.position.y - Math.sin(ship.rotation.z) * 1.2, { count: 2, speed: [10, 18], life: [0.15, 0.28], size: [0.18, 0.35], color: 0x88bbff });
+      particles.emitBurst(ship.position.x - Math.cos(shipDirection) * 1.2, ship.position.y - Math.sin(shipDirection) * 1.2, { count: 2, speed: [10, 18], life: [0.15, 0.28], size: [0.18, 0.35], color: 0x88bbff });
     }
   } else {
     trail.visible = false;
@@ -1256,6 +1294,9 @@ function update(dt) {
   ship.position.x += s.vx * dt;
   ship.position.y += s.vy * dt;
   wrap(ship);
+
+  // Update drones
+  updateDrones(dt);
 
   // Update trail positions
   if (trail.visible) {
@@ -1324,7 +1365,11 @@ function update(dt) {
     e.userData.vy += diry * e.userData.accel * dt;
     [e.userData.vx, e.userData.vy] = clampMag(e.userData.vx, e.userData.vy, e.userData.maxSpeed);
     e.position.x += e.userData.vx * dt; e.position.y += e.userData.vy * dt; wrap(e);
-    e.rotation.z = Math.atan2(dy, dx);
+    
+    // Make boss sprites rotate in the direction they are flying (same as player ship)
+    const moveDirection = Math.atan2(e.userData.vy, e.userData.vx);
+    e.rotation.z = moveDirection;
+    
     // Bosses no longer shoot - removed shooting logic
   }
 
@@ -1407,6 +1452,22 @@ function update(dt) {
           die('Asteroid collision');
         }
         break;
+      }
+    }
+    
+    // Check drone-asteroid collisions and push drones away (immunity)
+    for (const drone of drones) {
+      if (!drone.mesh) continue;
+      for (const a of asteroids) {
+        if (circleHit(a.position.x, a.position.y, a.userData.radius, drone.mesh.position.x, drone.mesh.position.y, 0.5)) {
+          // Push drone away from asteroid instead of destroying it
+          const dx = drone.mesh.position.x - a.position.x;
+          const dy = drone.mesh.position.y - a.position.y;
+          const dist = Math.hypot(dx, dy) + 1e-3;
+          const pushForce = 15; // Strong push to get clear
+          drone.mesh.position.x += (dx / dist) * pushForce * dt;
+          drone.mesh.position.y += (dy / dist) * pushForce * dt;
+        }
       }
     }
     // enemy vs ship (ram)
