@@ -56,8 +56,6 @@ const clampMag = (vx, vy, max) => {
   }
   return [vx, vy];
 };
-function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
-
 // Basic 2D wrapping in X/Y plane (uses full world bounds, not visible area)
 function wrap(obj) {
   // Fixed 250x166 world wrapping - NEVER changes
@@ -93,7 +91,6 @@ if (window.__status) window.__status.log('Renderer: ' + (renderer.capabilities.i
 const aspect = window.innerWidth / window.innerHeight;
 // Visible area is exactly 1/5 of world (150x99.6) - 3x larger
 const VISIBLE_HEIGHT = WORLD.height / 5; // 99.6 units visible
-const VISIBLE_WIDTH = WORLD.width / 5;   // 150 units visible
 let currentZoom = 1.0; // Fixed zoom level
 const frustumHeight = VISIBLE_HEIGHT;
 const frustumWidth = VISIBLE_HEIGHT * aspect; // Maintain aspect ratio
@@ -290,8 +287,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Materials
-const glowMat = new THREE.MeshStandardMaterial({ color: 0xa5c8ff, emissive: 0x335dff, emissiveIntensity: 1.7, roughness: 0.25, metalness: 0.0 });
-const bulletMat = new THREE.MeshStandardMaterial({ color: 0xffcc88, emissive: 0xff8800, emissiveIntensity: 2.0, roughness: 0.2, metalness: 0.1 });
+const bulletMat = createStandardMaterial(0xffcc88, 0xff8800, 2.0);
 // Simple toon gradient texture
 function makeToonGradient(stopsIn) {
   const c = document.createElement('canvas');
@@ -327,7 +323,6 @@ function makeToonRimMaterial(color = 0xb9c9dc, gradient = toonGradient, rimColor
   return mat;
 }
 
-const asteroidBaseMat = makeToonRimMaterial(0xeff7ff, toonGradient, 0xffffff, 1.25, 1.8);
 
 // Palette variants for asteroids
 function asteroidMaterialVariant() {
@@ -343,8 +338,6 @@ function asteroidMaterialVariant() {
     return makeToonRimMaterial(0xe9f0f7, makeToonGradient(['#6f7f9a','#aeb9cc','#dfe7f1','#ffffff']), 0xffffff, 1.1, 1.6);
   }
 }
-const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0x882222, emissiveIntensity: 1.0, roughness: 0.4, metalness: 0.1 });
-const enemyBulletMat = new THREE.MeshStandardMaterial({ color: 0xff8888, emissive: 0xff4444, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.1 });
 
 // Lights
 const key = new THREE.PointLight(0x6688ff, 1.4, 220);
@@ -519,7 +512,10 @@ class DebrisSystem {
     this.active = new Set();
     const geo = new THREE.TetrahedronGeometry(0.4);
     for (let i = 0; i < count; i++) {
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x9aa3ad, roughness: 1, metalness: 0, transparent: true, opacity: 1 }));
+      const mat = createStandardMaterial(0x9aa3ad, 0x000000, 0, 1, 0);
+      mat.transparent = true;
+      mat.opacity = 1;
+      const m = new THREE.Mesh(geo, mat);
       m.visible = false;
       m.userData = { vx: 0, vy: 0, life: 0, ttl: 0, rot: 0 };
       this.pool.push(m);
@@ -890,17 +886,6 @@ function createHunter(x, y) {
   return mesh;
 }
 
-function createEnemyBullet(x, y, dir) {
-  const g = new THREE.SphereGeometry(0.35, 8, 8);
-  const b = new THREE.Mesh(g, enemyBulletMat);
-  b.position.set(x, y, 0);
-  b.userData = { kind: 'eBullet', vx: Math.cos(dir) * ENEMY.bulletSpeed, vy: Math.sin(dir) * ENEMY.bulletSpeed, life: ENEMY.bulletLife, radius: 0.35 };
-  scene.add(b);
-  return b;
-}
-
-function eShoot(x, y, dir) { eBullets.push(createEnemyBullet(x, y, dir)); }
-
 // Telegraph beacon then spawn enemy
 function spawnBeacon(x, y, delay, onDone) {
   const ringG = new THREE.RingGeometry(0.2, 0.35, 32);
@@ -1007,8 +992,6 @@ const shopCardsEl = document.getElementById('shopCards');
 const leaveHangarBtn = document.getElementById('leaveHangar');
 const nextMissionBtn = document.getElementById('nextMission');
 const rerollBtn = document.getElementById('rerollShop');
-const banishBtn = document.getElementById('banishOne');
-const toggleVisBtn = document.getElementById('toggleVis');
 
 // Hangar currency display elements
 const hangarSalvageEl = document.getElementById('hangarSalvage');
@@ -1121,7 +1104,7 @@ function novaBlast() {
     const a = asteroids[i];
     const dx = a.position.x - ship.position.x; const dy = a.position.y - ship.position.y;
     if (dx*dx + dy*dy <= r*r) {
-      scene.remove(a); asteroids.splice(i, 1);
+      removeObjectFromGame(a, asteroids, i);
       particles.emitBurst(a.position.x, a.position.y, { count: 24, speed: [16, 40], life: [0.25, 0.6], size: [0.25, 1.1], color: 0xffe0aa });
       debris.burst(a.position.x, a.position.y, 12);
       addShake(0.8, 0.2, a.position.x, a.position.y);
@@ -1285,7 +1268,7 @@ function resetGame() {
   // Update score and wave display
   waveEl.textContent = `Wave: ${wave}`;
   
-  ship.rotation.z = 0; // pointing right (geometry aligned correctly)
+  ship.rotation.z = Math.PI; // pointing left (flipped around)
   invuln = 2.0; // brief safety window
   spawnWave();
   gameoverEl.hidden = true;
@@ -1357,6 +1340,51 @@ function splitAsteroid(a) {
 function removeFrom(arr, item) {
   const i = arr.indexOf(item);
   if (i >= 0) arr.splice(i, 1);
+}
+
+function removeObjectFromGame(obj, array, index = -1) {
+  scene.remove(obj);
+  if (index >= 0) {
+    array.splice(index, 1);
+  } else {
+    removeFrom(array, obj);
+  }
+  const outlineIndex = outlineTargets.indexOf(obj);
+  if (outlineIndex >= 0) outlineTargets.splice(outlineIndex, 1);
+}
+
+function addComboScore(baseScore) {
+  combo += 1;
+  comboTimer = 2.3;
+  const mult = 1 + 0.2 * (combo - 1);
+  score += Math.round(baseScore * mult);
+}
+
+function createStandardMaterial(color, emissive, emissiveIntensity = 1.0, roughness = 0.2, metalness = 0.1) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    emissive,
+    emissiveIntensity,
+    roughness,
+    metalness
+  });
+}
+
+function handleShieldDamage(shieldParticleColor = 0x66ccff) {
+  if (mods.shields > 0) {
+    mods.shields -= 1;
+    invuln = 1.0;
+    particles.emitBurst(ship.position.x, ship.position.y, {
+      count: 24,
+      speed: [20, 40],
+      life: [0.2, 0.5],
+      size: [0.3, 1.2],
+      color: shieldParticleColor
+    });
+    SFX.play('shield');
+    return true;
+  }
+  return false;
 }
 
 // Camera shake (calmed further)
@@ -1451,7 +1479,7 @@ function update(dt) {
     // Only update rotation if mouse is not too close to ship
     if (distance > minDistance) {
       const ang = Math.atan2(dy, dx);
-      ship.rotation.z = ang - Math.PI/2; // Adjust for mesh facing up by default
+      ship.rotation.z = ang + Math.PI/2; // Adjust for mesh facing up by default, flipped around
     }
   }
   const turnLeft = keys.has('a') || keys.has('arrowleft');
@@ -1527,7 +1555,7 @@ function update(dt) {
     const b = bullets[i];
     b.userData.life -= dt;
     if (b.userData.life <= 0) {
-      scene.remove(b); bullets.splice(i, 1); continue;
+      removeObjectFromGame(b, bullets, i); continue;
     }
     b.position.x += b.userData.vx * dt;
     b.position.y += b.userData.vy * dt;
@@ -1599,14 +1627,11 @@ function update(dt) {
         if (b.userData.pierce > 0) {
           b.userData.pierce -= 1;
         } else {
-          scene.remove(b); bullets.splice(j, 1);
+          removeObjectFromGame(b, bullets, j);
         }
-        scene.remove(a); asteroids.splice(i, 1); const oi = outlineTargets.indexOf(a); if (oi>=0) outlineTargets.splice(oi,1);
+        removeObjectFromGame(a, asteroids, i);
         const def = ASTEROIDS[a.userData.size];
-        // combo handling
-        combo += 1; comboTimer = 2.3; // 2.3s to continue chain
-        const mult = 1 + 0.2 * (combo - 1);
-        score += Math.round(def.score * mult);
+        addComboScore(def.score);
               // spawn pickups
         spawnDrops(a);
         // particles burst
@@ -1627,10 +1652,9 @@ function update(dt) {
     for (let j = bullets.length - 1; j >= 0; j--) {
       const b = bullets[j];
       if (circleHit(e.position.x, e.position.y, ENEMY.radius, b.position.x, b.position.y, b.userData.radius)) {
-        if (b.userData.pierce > 0) b.userData.pierce -= 1; else { scene.remove(b); bullets.splice(j, 1); }
-        scene.remove(e); enemies.splice(i, 1); { const oi = outlineTargets.indexOf(e); if (oi>=0) outlineTargets.splice(oi,1); }
-        combo += 1; comboTimer = 2.3; const mult = 1 + 0.2 * (combo - 1);
-        score += Math.round(ENEMY.score * mult);
+        if (b.userData.pierce > 0) b.userData.pierce -= 1; else { removeObjectFromGame(b, bullets, j); }
+        removeObjectFromGame(e, enemies, i);
+        addComboScore(ENEMY.score);
         particles.emitBurst(e.position.x, e.position.y, { count: 18, speed: [14, 34], life: [0.25, 0.55], size: [0.22, 0.8], color: 0xffaaaa });
         debris.burst(e.position.x, e.position.y, 8); SFX.play('explode');
         addShake(0.6, 0.12, e.position.x, e.position.y);
@@ -1643,10 +1667,7 @@ function update(dt) {
   if (invuln <= 0) {
     for (const a of asteroids) {
       if (circleHit(a.position.x, a.position.y, a.userData.radius, ship.position.x, ship.position.y, ship.userData.radius)) {
-        if (mods.shields > 0) {
-          mods.shields -= 1;
-          invuln = 1.0;
-          particles.emitBurst(ship.position.x, ship.position.y, { count: 24, speed: [20, 40], life: [0.2, 0.5], size: [0.3, 1.2], color: 0x66ccff }); SFX.play('shield');
+        if (handleShieldDamage()) {
           addShake(0.8, 0.2, ship.position.x, ship.position.y);
           break;
         } else {
@@ -1674,7 +1695,7 @@ function update(dt) {
     // enemy vs ship (ram)
     for (const e of enemies) {
       if (circleHit(e.position.x, e.position.y, ENEMY.radius, ship.position.x, ship.position.y, ship.userData.radius)) {
-        if (mods.shields > 0) { mods.shields -= 1; invuln = 1.0; particles.emitBurst(ship.position.x, ship.position.y, { count: 20, speed: [18, 36], life: [0.2, 0.45], size: [0.3, 1.0], color: 0x66ccff }); SFX.play('shield'); addShake(0.6, 0.12, ship.position.x, ship.position.y); }
+        if (handleShieldDamage()) { addShake(0.6, 0.12, ship.position.x, ship.position.y); }
         else { die('Enemy collision'); }
         break;
       }
@@ -1960,7 +1981,7 @@ function tunedMaxSpeed() { return PLAYER.maxSpeed * mods.engineMul; }
 // Drones
 function addDrone() {
   const geo = new THREE.SphereGeometry(0.5, 12, 12);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x92ffdd, emissive: 0x227755, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.1 });
+  const mat = createStandardMaterial(0x92ffdd, 0x227755, 0.7, 0.3);
   const mesh = new THREE.Mesh(geo, mat);
   
   // Initialize with random angle offset for multiple drones
@@ -2082,7 +2103,7 @@ function updatePickups(dt){
         p.userData.vx += ax; p.userData.vy += ay;
       }
       if (d < 0.8){
-        collectPickup(p); scene.remove(p); pickups.splice(i,1); continue;
+        collectPickup(p); removeObjectFromGame(p, pickups, i); continue;
       }
     }
     const t = Math.max(0,1 - p.userData.age/10); p.material.opacity = 0.4 + 0.6*t;
