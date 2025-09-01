@@ -11,10 +11,10 @@ import { OutlinePass } from 'https://unpkg.com/three@0.158.0/examples/jsm/postpr
 // Boot marker for diagnostics
 window.__gameBoot = 'starting';
 
-// Config
+// Config - Fixed world size that NEVER changes
 const WORLD = {
-  width: 180,  // 4x larger play area (was 90)
-  height: 120,  // 4x larger play area (was 60)
+  width: 750,   // Total world width - NEVER changes (3x larger)
+  height: 498,  // Total world height - NEVER changes (3x larger)
 };
 
 const PLAYER = {
@@ -60,15 +60,13 @@ function clamp(v, min, max) { return v < min ? min : (v > max ? max : v); }
 
 // Basic 2D wrapping in X/Y plane (uses full world bounds, not visible area)
 function wrap(obj) {
-  // Use full world bounds regardless of zoom level
-  // This means objects wrap around the larger 3x3 total world, not just visible area
-  const zoomFactor = 1 / 1.0; // Use the max zoom-out factor (1.0) to define full world
-  const hw = (WORLD.width * 0.5) * zoomFactor;
-  const hh = (WORLD.height * 0.5) * zoomFactor;
-  if (obj.position.x > hw) obj.position.x = -hw;
-  if (obj.position.x < -hw) obj.position.x = hw;
-  if (obj.position.y > hh) obj.position.y = -hh;
-  if (obj.position.y < -hh) obj.position.y = hh;
+  // Fixed 250x166 world wrapping - NEVER changes
+  const halfWorldX = WORLD.width * 0.5;  // 125 units
+  const halfWorldY = WORLD.height * 0.5; // 83 units
+  if (obj.position.x > halfWorldX) obj.position.x = -halfWorldX;
+  if (obj.position.x < -halfWorldX) obj.position.x = halfWorldX;
+  if (obj.position.y > halfWorldY) obj.position.y = -halfWorldY;
+  if (obj.position.y < -halfWorldY) obj.position.y = halfWorldY;
 }
 
 function circleHit(ax, ay, ar, bx, by, br) {
@@ -79,7 +77,7 @@ function circleHit(ax, ay, ar, bx, by, br) {
 }
 
 // Scene setup
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true }); // Disable antialias for sharp edges
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -93,9 +91,12 @@ if (window.__status) window.__status.log('Renderer: ' + (renderer.capabilities.i
 
 // Orthographic camera for crisp, arcade feel
 const aspect = window.innerWidth / window.innerHeight;
-let currentZoom = 1.0; // Show about 1/4 of total world area
-const frustumHeight = WORLD.height;
-const frustumWidth = frustumHeight * aspect;
+// Visible area is exactly 1/5 of world (150x99.6) - 3x larger
+const VISIBLE_HEIGHT = WORLD.height / 5; // 99.6 units visible
+const VISIBLE_WIDTH = WORLD.width / 5;   // 150 units visible
+let currentZoom = 1.0; // Fixed zoom level
+const frustumHeight = VISIBLE_HEIGHT;
+const frustumWidth = VISIBLE_HEIGHT * aspect; // Maintain aspect ratio
 const camera = new THREE.OrthographicCamera(
   -frustumWidth / 2,
   frustumWidth / 2,
@@ -124,27 +125,43 @@ function makeStars() {
   }
   
   const g = new THREE.BufferGeometry();
-  const count = 1200;
+  const count = 16000; // Ultra-dense starfield for true space immersion
   const positions = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
+  const colors = new Float32Array(count * 3); // RGB colors for brightness variation
   
   for (let i = 0; i < count; i++) {
-    positions[i * 3 + 0] = rand(-WORLD.width * 1.5, WORLD.width * 1.5);
-    positions[i * 3 + 1] = rand(-WORLD.height * 1.5, WORLD.height * 1.5);
-    positions[i * 3 + 2] = rand(-50, -5); // Further back to ensure visibility
-    sizes[i] = rand(0.5, 1.5);
+    positions[i * 3 + 0] = rand(-WORLD.width * 3.0, WORLD.width * 3.0);  // Much wider for complete coverage
+    positions[i * 3 + 1] = rand(-WORLD.height * 3.0, WORLD.height * 3.0); // Much taller for complete coverage
+    positions[i * 3 + 2] = rand(-120, -3); // Even more depth layers for rich parallax
+    sizes[i] = rand(0.2, 2.2); // Wider range - tiny background dots to prominent stars
+    
+    // Bell curve brightness distribution (using Box-Muller transform for normal distribution)
+    let brightness;
+    const u1 = Math.random();
+    const u2 = Math.random();
+    const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    
+    // Convert normal distribution to brightness range with bell curve centered on dim stars
+    // Most stars dim (0.2-0.8), fewer medium (0.8-1.4), very few bright (1.4-2.0) - doubled brightness
+    const normalizedBrightness = Math.max(0.2, Math.min(2.0, (0.35 + z0 * 0.15) * 2.0));
+    brightness = normalizedBrightness;
+    colors[i * 3 + 0] = 0.67 * brightness; // R component (blue-white)
+    colors[i * 3 + 1] = 0.8 * brightness;  // G component
+    colors[i * 3 + 2] = 1.0 * brightness;  // B component (strongest for blue-white)
   }
   
   g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   g.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   
   const m = new THREE.PointsMaterial({ 
-    size: 1.0, // Larger base size
-    color: 0x88aaff, 
+    size: 1.5, // 25% larger size (1.2 * 1.25) for 25% brighter appearance
+    color: 0xddffff, // 25% brighter base color
     transparent: true, 
-    opacity: 0.8, // More visible
+    opacity: 1.0, // Fully opaque
     sizeAttenuation: true, // Size based on distance
-    vertexColors: false
+    vertexColors: true // Enable per-vertex colors for brightness variation
   });
   
   currentStars = new THREE.Points(g, m);
@@ -543,8 +560,9 @@ class MinimapSystem {
   constructor() {
     this.canvas = document.getElementById('minimapCanvas');
     this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
-    this.worldWidth = (WORLD.width * 0.5) * (1 / 1.0); // Full world bounds
-    this.worldHeight = (WORLD.height * 0.5) * (1 / 1.0);
+    // Fixed world bounds - 250x166 total world, centered at origin
+    this.worldWidth = WORLD.width * 0.5;  // 125 units (half-width from center)
+    this.worldHeight = WORLD.height * 0.5; // 83 units (half-height from center)
     this.scale = Math.min(this.canvas?.width / (this.worldWidth * 2), this.canvas?.height / (this.worldHeight * 2));
   }
   
@@ -567,19 +585,6 @@ class MinimapSystem {
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(0, 0, this.canvas.width, this.canvas.height);
     
-    // Draw visible area (current camera view)
-    if (camera && ship) {
-      const visibleWidth = (WORLD.width * 0.5) / camera.zoom;
-      const visibleHeight = (WORLD.height * 0.5) / camera.zoom;
-      const visX1 = (ship.position.x - visibleWidth + this.worldWidth) * this.scale;
-      const visY1 = (ship.position.y - visibleHeight + this.worldHeight) * this.scale;
-      const visX2 = (ship.position.x + visibleWidth + this.worldWidth) * this.scale;
-      const visY2 = (ship.position.y + visibleHeight + this.worldHeight) * this.scale;
-      
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      this.ctx.lineWidth = 1;
-      this.ctx.strokeRect(visX1, visY1, visX2 - visX1, visY2 - visY1);
-    }
     
     // Draw asteroids
     if (asteroids && asteroids.length > 0) {
@@ -639,6 +644,12 @@ function createShip() {
     'assets/ship/ship.png',
     // onLoad callback
     (texture) => {
+      // Ultra-sharp rendering - eliminate all blur/glow
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.flipY = false; // Prevent texture flipping blur
+      texture.premultiplyAlpha = false; // Reduce alpha blending artifacts
       console.log('[Asteroids] Ship texture loaded successfully');
       if (window.__status) window.__status.log('Ship texture loaded');
     },
@@ -653,7 +664,7 @@ function createShip() {
   
   // Create ship sprite - but sprites don't rotate visually like meshes!
   // We need to use a PlaneGeometry with the texture instead for proper rotation
-  const shipGeometry = new THREE.PlaneGeometry(3.0, 3.0);
+  const shipGeometry = new THREE.PlaneGeometry(6.0, 6.0); // Much larger for better visibility
   const shipMaterial = new THREE.MeshBasicMaterial({ 
     map: shipTexture, 
     transparent: true,
@@ -982,14 +993,9 @@ let pausedForUpgrade = false;
 // Drone helpers
 let drones = [];
 let playerShotCounter = 0; // Track player shots for drone shooting
-const comboEl = document.getElementById('combo');
-
-const scoreEl = document.getElementById('score');
 const waveEl = document.getElementById('wave');
 const gameoverEl = document.getElementById('gameover');
 const finalScoreEl = document.getElementById('finalScore');
-const sfxVolEl = document.getElementById('sfxVol');
-const sfxMuteEl = document.getElementById('sfxMute');
 const frameEl = document.getElementById('frameCounter');
 const toggleLogBtn = document.getElementById('toggleLog');
 const takenEl = document.getElementById('taken');
@@ -1032,16 +1038,7 @@ function updateCurrencyHUD(){
   if(hangarAdamantiumEl) hangarAdamantiumEl.textContent=adamantium;
 }
 
-// Initialize SFX controls
-if (sfxVolEl && sfxMuteEl) {
-  // Load persisted
-  const initVol = (typeof SFX.getVolume === 'function') ? SFX.getVolume() : 0.8;
-  const initMuted = (typeof SFX.isMuted === 'function') ? SFX.isMuted() : false;
-  sfxVolEl.value = Math.round(initVol * 100);
-  sfxMuteEl.textContent = initMuted ? 'Unmute' : 'Mute';
-  sfxVolEl.addEventListener('input', () => { SFX.setVolume(parseInt(sfxVolEl.value,10)/100); if (SFX.isMuted()) SFX.toggleMute(); sfxMuteEl.textContent = SFX.isMuted() ? 'Unmute' : 'Mute'; });
-  sfxMuteEl.addEventListener('click', () => { const m = SFX.toggleMute(); sfxMuteEl.textContent = m ? 'Unmute' : 'Mute'; });
-}
+// SFX controls removed from main HUD - available in pause menu
 // Log toggle button always available
 if (toggleLogBtn) toggleLogBtn.onclick = () => { const s = document.getElementById('status'); if (s) s.dataset.show = s.dataset.show === '1' ? '0' : '1'; };
 
@@ -1131,7 +1128,6 @@ function novaBlast() {
       score += 50; // small bonus
     }
   }
-  scoreEl.textContent = `Score: ${score}`;
   SFX.play('explode');
 }
 
@@ -1252,7 +1248,7 @@ function resetGame() {
   score = 0;
   wave = 1;
   gameOver = false;
-  combo = 1; comboTimer = 0; comboEl.textContent = `Combo: ${combo}x`;
+  combo = 1; comboTimer = 0;
   ship.userData.vx = 0;
   ship.userData.vy = 0;
   ship.position.set(0, 0, 0);
@@ -1287,39 +1283,36 @@ function resetGame() {
   }
   
   // Update score and wave display
-  scoreEl.textContent = `Score: ${score}`;
   waveEl.textContent = `Wave: ${wave}`;
   
-  ship.rotation.z = Math.PI / 2; // pointing up (geometry aligned to +X)
+  ship.rotation.z = 0; // pointing right (geometry aligned correctly)
   invuln = 2.0; // brief safety window
   spawnWave();
   gameoverEl.hidden = true;
 }
 
 function spawnWave() {
-  const count = 3 + wave;
+  const count = (3 + wave) * 2; // Double the asteroid count
   for (let i = 0; i < count; i++) {
-    // Spawn asteroids off-screen accounting for full world bounds
-    // Use consistent full world bounds (not based on current zoom)
-    const zoomFactor = 1 / 1.0; // Use the max zoom-out factor to define full world
-    const visibleWidth = (WORLD.width * 0.5) * zoomFactor;
-    const visibleHeight = (WORLD.height * 0.5) * zoomFactor;
+    // Spawn asteroids outside the fixed 250x166 world bounds
+    const halfWorldX = WORLD.width * 0.5;  // 125 units
+    const halfWorldY = WORLD.height * 0.5; // 83 units
+    const buffer = 20; // Fixed buffer distance
     
-    // Add buffer to ensure they start completely outside visible area
-    const buffer = 15 * zoomFactor; // Scale buffer with zoom
-    const minX = visibleWidth + buffer;
-    const minY = visibleHeight + buffer;
+    // Spawn outside world bounds with buffer
+    const spawnMinX = halfWorldX + buffer;  // 145 units from center
+    const spawnMinY = halfWorldY + buffer;  // 103 units from center
     
-    // Randomly choose whether to spawn on X or Y boundary
+    // Randomly choose spawn position around world perimeter
     let x, y;
     if (Math.random() < 0.5) {
       // Spawn on left/right edge
-      x = randSign() * rand(minX, minX + 20 * zoomFactor);
-      y = randSign() * rand(0, minY);
+      x = randSign() * rand(spawnMinX, spawnMinX + 30);
+      y = randSign() * rand(0, spawnMinY);
     } else {
-      // Spawn on top/bottom edge
-      x = randSign() * rand(0, minX);
-      y = randSign() * rand(minY, minY + 20 * zoomFactor);
+      // Spawn on top/bottom edge  
+      x = randSign() * rand(0, spawnMinX);
+      y = randSign() * rand(spawnMinY, spawnMinY + 30);
     }
     
     // Point toward center with some variation
@@ -1338,10 +1331,9 @@ function spawnEnemiesForWave() {
   if (wave < 3) return;
   const count = Math.min(1 + Math.floor((wave - 2) / 2), 4);
   for (let i = 0; i < count; i++) {
-    // Account for full world bounds when spawning enemies - they should appear at safe distance from visible area
-    const zoomFactor = 1 / 1.0; // Use the max zoom-out factor to define full world
-    const baseDistance = Math.max(WORLD.width * 0.35, WORLD.height * 0.35) * zoomFactor;
-    const maxDistance = Math.max(WORLD.width * 0.48, WORLD.height * 0.48) * zoomFactor;
+    // Spawn enemies outside the fixed 250x166 world bounds  
+    const baseDistance = Math.max(WORLD.width * 0.6, WORLD.height * 0.6); // 150+ units from center
+    const maxDistance = Math.max(WORLD.width * 0.8, WORLD.height * 0.8);  // 200+ units from center
     const x = randSign() * rand(baseDistance, maxDistance);
     const y = randSign() * rand(baseDistance, maxDistance);
     spawnBeacon(x, y, 1.1 + Math.random()*0.4, () => createHunter(x, y));
@@ -1432,7 +1424,8 @@ function tick() {
   
   // frame counter (debug)
   frames++; if (frameEl) frameEl.textContent = String(frames);
-  composer.render();
+  // Direct rendering for sharp graphics - bypass bloom/outline effects
+  renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
@@ -1545,13 +1538,14 @@ function update(dt) {
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     if (!b.userData || !b.userData.ricochet) continue;
-    // Use same full world bounds as wrap() function
-    const zoomFactor = 1 / 1.0; // Use the max zoom-out factor to define full world
-    const hw = (WORLD.width * 0.5) * zoomFactor, hh = (WORLD.height * 0.5) * zoomFactor; let bounced = false;
-    if (b.position.x > hw) { b.position.x = hw; b.userData.vx *= -1; bounced = true; }
-    if (b.position.x < -hw) { b.position.x = -hw; b.userData.vx *= -1; bounced = true; }
-    if (b.position.y > hh) { b.position.y = hh; b.userData.vy *= -1; bounced = true; }
-    if (b.position.y < -hh) { b.position.y = -hh; b.userData.vy *= -1; bounced = true; }
+    // Fixed 250x166 world bounds for ricochet
+    const halfWorldX = WORLD.width * 0.5;  // 125 units
+    const halfWorldY = WORLD.height * 0.5; // 83 units
+    let bounced = false;
+    if (b.position.x > halfWorldX) { b.position.x = halfWorldX; b.userData.vx *= -1; bounced = true; }
+    if (b.position.x < -halfWorldX) { b.position.x = -halfWorldX; b.userData.vx *= -1; bounced = true; }
+    if (b.position.y > halfWorldY) { b.position.y = halfWorldY; b.userData.vy *= -1; bounced = true; }
+    if (b.position.y < -halfWorldY) { b.position.y = -halfWorldY; b.userData.vy *= -1; bounced = true; }
     if (bounced) { b.userData.ricochet -= 1; particles.emitBurst(b.position.x, b.position.y, { count: 6, speed: [8, 18], life: [0.08, 0.18], size: [0.18, 0.4], color: 0xbbe0ff }); SFX.play('ricochet'); if (b.userData.ricochet <= 0) b.userData.ricochet = 0; }
   }
 
@@ -1613,9 +1607,7 @@ function update(dt) {
         combo += 1; comboTimer = 2.3; // 2.3s to continue chain
         const mult = 1 + 0.2 * (combo - 1);
         score += Math.round(def.score * mult);
-        comboEl.textContent = `Combo: ${combo}x`;
-        scoreEl.textContent = `Score: ${score}`;
-        // spawn pickups
+              // spawn pickups
         spawnDrops(a);
         // particles burst
         particles.emitBurst(a.position.x, a.position.y, { count: 16, speed: [12, 36], life: [0.25, 0.6], size: [0.25, 1.0], color: 0xaad0ff });
@@ -1638,7 +1630,7 @@ function update(dt) {
         if (b.userData.pierce > 0) b.userData.pierce -= 1; else { scene.remove(b); bullets.splice(j, 1); }
         scene.remove(e); enemies.splice(i, 1); { const oi = outlineTargets.indexOf(e); if (oi>=0) outlineTargets.splice(oi,1); }
         combo += 1; comboTimer = 2.3; const mult = 1 + 0.2 * (combo - 1);
-        score += Math.round(ENEMY.score * mult); scoreEl.textContent = `Score: ${score}`; comboEl.textContent = `Combo: ${combo}x`;
+        score += Math.round(ENEMY.score * mult);
         particles.emitBurst(e.position.x, e.position.y, { count: 18, speed: [14, 34], life: [0.25, 0.55], size: [0.22, 0.8], color: 0xffaaaa });
         debris.burst(e.position.x, e.position.y, 8); SFX.play('explode');
         addShake(0.6, 0.12, e.position.x, e.position.y);
@@ -1805,7 +1797,7 @@ window.addEventListener('keydown', (e) => {
 setInterval(() => {
   if (comboTimer > 0 && !pausedForUpgrade && !gameOver) {
     comboTimer -= 0.25;
-    if (comboTimer <= 0) { combo = 1; comboEl.textContent = `Combo: ${combo}x`; }
+    if (comboTimer <= 0) { combo = 1; }
   }
 }, 250);
 

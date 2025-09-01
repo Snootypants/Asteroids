@@ -281,7 +281,7 @@ html, body {
   display: grid;
   grid-template-columns: repeat(3, 280px);
   gap: 64px; /* more separation */
-  transform: translateY(-30px); /* center-ish */
+  transform: translateY(-60px); /* Move higher to center properly and avoid minimap */
 }
 .choice-card {
   cursor: pointer;
